@@ -26,6 +26,7 @@ type NavItem = NavCollapsible | NavLink
 
 type NavGroup = {
   title: string
+  logo?: React.ElementType
   items: NavItem[]
 }
 

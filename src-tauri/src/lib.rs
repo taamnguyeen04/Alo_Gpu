@@ -46,6 +46,30 @@ pub fn run() {
             commands::tensorboard::start_tensorboard,
             commands::tensorboard::stop_tensorboard,
             commands::tensorboard::create_tensorboard_dir,
+            // Kaggle commands
+            commands::kaggle::kaggle_cli_available,
+            commands::kaggle::kaggle_list_accounts,
+            commands::kaggle::kaggle_get_active_global,
+            commands::kaggle::kaggle_add_account,
+            commands::kaggle::kaggle_add_token_account,
+            commands::kaggle::kaggle_update_account,
+            commands::kaggle::kaggle_remove_account,
+            commands::kaggle::kaggle_set_active_account,
+            commands::kaggle::kaggle_quota,
+            // Kaggle kernels
+            commands::kaggle::kaggle_kernels,
+            commands::kaggle::kaggle_kernel_status,
+            commands::kaggle::kaggle_kernel_logs,
+            commands::kaggle::kaggle_kernel_output_files,
+            commands::kaggle::kaggle_kernel_push,
+            commands::kaggle::kaggle_kernel_output_download,
+            commands::kaggle::kaggle_list_folder_files,
+            // Kaggle datasets
+            commands::kaggle::kaggle_datasets,
+            commands::kaggle::kaggle_dataset_files,
+            commands::kaggle::kaggle_dataset_download,
+            commands::kaggle::kaggle_dataset_create,
+            commands::kaggle::kaggle_dataset_version,
         ])
         .manage(commands::tensorboard::TensorboardState::default())
         .setup(|app| {

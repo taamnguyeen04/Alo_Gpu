@@ -27,6 +27,9 @@ import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_auth
 import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
 import { Route as AuthenticatedTensorboardIndexRouteImport } from './routes/_authenticated/tensorboard/index'
 import { Route as AuthenticatedVolumesIndexRouteImport } from './routes/_authenticated/volumes/index'
+import { Route as AuthenticatedKaggleAccountsIndexRouteImport } from './routes/_authenticated/kaggle/accounts/index'
+import { Route as AuthenticatedKaggleDatasetsIndexRouteImport } from './routes/_authenticated/kaggle/datasets/index'
+import { Route as AuthenticatedKaggleKernelsIndexRouteImport } from './routes/_authenticated/kaggle/kernels/index'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
@@ -127,6 +130,24 @@ const AuthenticatedVolumesIndexRoute =
     path: '/volumes/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedKaggleAccountsIndexRoute =
+  AuthenticatedKaggleAccountsIndexRouteImport.update({
+    id: '/kaggle/accounts/',
+    path: '/kaggle/accounts/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedKaggleDatasetsIndexRoute =
+  AuthenticatedKaggleDatasetsIndexRouteImport.update({
+    id: '/kaggle/datasets/',
+    path: '/kaggle/datasets/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedKaggleKernelsIndexRoute =
+  AuthenticatedKaggleKernelsIndexRouteImport.update({
+    id: '/kaggle/kernels/',
+    path: '/kaggle/kernels/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -146,6 +167,9 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/tensorboard/': typeof AuthenticatedTensorboardIndexRoute
   '/volumes/': typeof AuthenticatedVolumesIndexRoute
+  '/kaggle/accounts/': typeof AuthenticatedKaggleAccountsIndexRoute
+  '/kaggle/datasets/': typeof AuthenticatedKaggleDatasetsIndexRoute
+  '/kaggle/kernels/': typeof AuthenticatedKaggleKernelsIndexRoute
 }
 export interface FileRoutesByTo {
   '/401': typeof errors401Route
@@ -164,6 +188,9 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/tensorboard': typeof AuthenticatedTensorboardIndexRoute
   '/volumes': typeof AuthenticatedVolumesIndexRoute
+  '/kaggle/accounts': typeof AuthenticatedKaggleAccountsIndexRoute
+  '/kaggle/datasets': typeof AuthenticatedKaggleDatasetsIndexRoute
+  '/kaggle/kernels': typeof AuthenticatedKaggleKernelsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -185,6 +212,9 @@ export interface FileRoutesById {
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/tensorboard/': typeof AuthenticatedTensorboardIndexRoute
   '/_authenticated/volumes/': typeof AuthenticatedVolumesIndexRoute
+  '/_authenticated/kaggle/accounts/': typeof AuthenticatedKaggleAccountsIndexRoute
+  '/_authenticated/kaggle/datasets/': typeof AuthenticatedKaggleDatasetsIndexRoute
+  '/_authenticated/kaggle/kernels/': typeof AuthenticatedKaggleKernelsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -206,6 +236,9 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/tensorboard/'
     | '/volumes/'
+    | '/kaggle/accounts/'
+    | '/kaggle/datasets/'
+    | '/kaggle/kernels/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/401'
@@ -224,6 +257,9 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tensorboard'
     | '/volumes'
+    | '/kaggle/accounts'
+    | '/kaggle/datasets'
+    | '/kaggle/kernels'
   id:
     | '__root__'
     | '/_authenticated'
@@ -244,6 +280,9 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/'
     | '/_authenticated/tensorboard/'
     | '/_authenticated/volumes/'
+    | '/_authenticated/kaggle/accounts/'
+    | '/_authenticated/kaggle/datasets/'
+    | '/_authenticated/kaggle/kernels/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -383,6 +422,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVolumesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/kaggle/accounts/': {
+      id: '/_authenticated/kaggle/accounts/'
+      path: '/kaggle/accounts'
+      fullPath: '/kaggle/accounts/'
+      preLoaderRoute: typeof AuthenticatedKaggleAccountsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/kaggle/datasets/': {
+      id: '/_authenticated/kaggle/datasets/'
+      path: '/kaggle/datasets'
+      fullPath: '/kaggle/datasets/'
+      preLoaderRoute: typeof AuthenticatedKaggleDatasetsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/kaggle/kernels/': {
+      id: '/_authenticated/kaggle/kernels/'
+      path: '/kaggle/kernels'
+      fullPath: '/kaggle/kernels/'
+      preLoaderRoute: typeof AuthenticatedKaggleKernelsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -417,6 +477,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSecretsIndexRoute: typeof AuthenticatedSecretsIndexRoute
   AuthenticatedTensorboardIndexRoute: typeof AuthenticatedTensorboardIndexRoute
   AuthenticatedVolumesIndexRoute: typeof AuthenticatedVolumesIndexRoute
+  AuthenticatedKaggleAccountsIndexRoute: typeof AuthenticatedKaggleAccountsIndexRoute
+  AuthenticatedKaggleDatasetsIndexRoute: typeof AuthenticatedKaggleDatasetsIndexRoute
+  AuthenticatedKaggleKernelsIndexRoute: typeof AuthenticatedKaggleKernelsIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -427,6 +490,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSecretsIndexRoute: AuthenticatedSecretsIndexRoute,
   AuthenticatedTensorboardIndexRoute: AuthenticatedTensorboardIndexRoute,
   AuthenticatedVolumesIndexRoute: AuthenticatedVolumesIndexRoute,
+  AuthenticatedKaggleAccountsIndexRoute: AuthenticatedKaggleAccountsIndexRoute,
+  AuthenticatedKaggleDatasetsIndexRoute: AuthenticatedKaggleDatasetsIndexRoute,
+  AuthenticatedKaggleKernelsIndexRoute: AuthenticatedKaggleKernelsIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

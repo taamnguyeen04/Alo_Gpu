@@ -5,3 +5,4 @@ pub mod secret;
 pub mod system;
 pub mod billing;
 pub mod tensorboard;
+pub mod kaggle;
