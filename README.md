@@ -1,8 +1,10 @@
 ﻿# AloGPU
 
-Ứng dụng desktop quản lý các dịch vụ ML cloud của bạn — hiện tại là **Modal** (workspaces, apps, volumes, secrets, TensorBoard, billing), và đang trong kế hoạch bổ sung **Kaggle** (datasets, notebooks).
+Ứng dụng desktop quản lý các dịch vụ ML cloud của bạn: **Modal** (workspaces, apps, volumes, secrets, TensorBoard, billing) và **Kaggle** (GPU miễn phí để chạy model — accounts, quota, kernels, datasets). Mỗi nền tảng có khối riêng trên sidebar với logo riêng.
 
-Phía backend Rust không gọi API trực tiếp mà bọc **Modal CLI** (`modal`), tự động đổi workspace qua biến môi trường `MODAL_PROFILE` → mọi hành động đều dùng đúng profile/modal account đã đăng nhập trên máy bạn.
+Phía backend Rust không gọi API trực tiếp mà bọc CLI:
+- **Modal CLI** (`modal`) — tự động đổi workspace qua biến môi trường `MODAL_PROFILE` → mọi hành động đều dùng đúng profile/modal account đã đăng nhập trên máy bạn.
+- **Kaggle CLI** (`kaggle` ≥ 2.2) — mỗi account chạy trong env cách ly riêng (`KAGGLE_CONFIG_DIR` cho legacy key, `KAGGLE_API_TOKEN` cho personal token), không ảnh hưởng nhau.
 
 Được xây dựng trên **Tauri 2 + React + shadcn/ui** (dựa trên template [shadcn-admin](https://github.com/satnaing/shadcn-admin)).
 
@@ -15,6 +17,13 @@ Phía backend Rust không gọi API trực tiếp mà bọc **Modal CLI** (`moda
 - **TensorBoard** — chọn thư mục log cục bộ, app tự khởi động TensorBoard local và nhúng iframe
 - **GPU Pricing / Billing** — tra giá GPU theo giờ, cập nhật costs hàng loạt cho mọi workspace
 
+### Kaggle — GPU miễn phí để chạy model
+
+- **Accounts** — dán username + legacy API key *hoặc* personal API token (verify thật ngay khi thêm); key chỉ lưu trong app data, UI chỉ nhận `••••` + 4 ký tự cuối; **Set Active** để mọi lệnh Kaggle ngoài app (terminal/script) dùng account đó; tự nhận diện account `~/.kaggle` toàn cục (read-only)
+- **Quota** — GPU/TPU hours còn lại trong tuần (`quota --format json`, fallback CSV cho CLI 1.x), bấm **Update All Quotas** tải quota cho tất cả account
+- **Kernels** — chạy model trên GPU Kaggle: **New Run** chọn folder chứa `.py`/`.ipynb` + accelerator (T4 x2 / L4 / A100 / H100 / TPU), xem status + log (poll 5s khi running), tải output về máy; rerun = version mới cùng slug
+- **Datasets** — upload folder thành dataset (mới hoặc version mới với notes bắt buộc), duyệt/tải files (unzip tuỳ chọn) làm nguồn data cho kernel
+
 ## 📋 Yêu cầu hệ thống
 
 | Thành phần                                        | Yêu cầu                      | Ghi chú                                                                        |
@@ -24,6 +33,7 @@ Phía backend Rust không gọi API trực tiếp mà bọc **Modal CLI** (`moda
 | Rust                                              | stable ≥ 1.77.2              | cài qua [rustup](https://rustup.rs/)                                           |
 | VS C++ Build Tools                                | bắt buộc trên Windows        | để compile Tauri (xem [prerequisites](https://tauri.app/start/prerequisites/)) |
 | [Modal CLI](https://modal.com/docs/reference/cli) | mới nhất                     | `pip install modal` rồi `modal setup` để đăng nhập                             |
+| [Kaggle CLI](https://github.com/Kaggle/kaggle-api) ≥ 2.2 | tuỳ chọn              | chỉ cần khi dùng tab Kaggle: `pip install kaggle`                              |
 | Python + TensorBoard                              | tùy chọn                     | chỉ cần khi dùng tab TensorBoard: `pip install tensorboard`                    |
 
 Kiểm tra đã đủ điều kiện:
@@ -32,6 +42,7 @@ Kiểm tra đã đủ điều kiện:
 node -v          # >= 20.19
 cargo --version  # >= 1.77
 modal profile list  # phải trả về ít nhất 1 profile đã login
+kaggle --version    # >= 2.2 (nếu dùng tab Kaggle)
 ```
 
 ## 🚀 Cài đặt
@@ -60,6 +71,41 @@ npm run dev
 ```
 
 Xem UI trên browser tại `http://localhost:5173` — các nút cần Tauri invoke sẽ báo lỗi (bình thường, vì không có backend desktop).
+
+## 🧠 Dùng tab Kaggle (quickstart)
+
+> **Lưu ý**: Kaggle bắt buộc **verify số điện thoại** trên tài khoản trước khi cho phép dùng GPU/Internet trong notebook.
+
+1. **Accounts** → **Add Account** → dán username + legacy API key, hoặc chỉ cần personal API token (Kaggle → Settings → API → Create New Token). App verify thật bằng lệnh `quota` ngay — sai key sẽ tự rollback.
+2. **Update All Quotas** → xem GPU/TPU hours còn lại của tuần (30h GPU / 20h TPU là mức mặc định Kaggle).
+3. **Kernels → New Run** → chọn folder chứa file code:
+   - `.py` → Type tự nhận **Script**, `.ipynb` → **Notebook** (vẫn chỉnh tay được)
+   - Accelerator mặc định **GPU T4 x2**; `Dataset sources` dán `username/slug` nếu cần data (mount sẵn ở `/kaggle/input/<slug>/`)
+   - **Push & Run** → mở viewer xem status + log (poll 5s) → **Output** → tải về máy
+4. Quy tắc Kaggle: mọi file save vào thư mục làm việc (`/kaggle/working`) thành **kernel output** — ở app chỉ cần bấm tải về là có `model.pt`, metrics...
+
+### `alo-run` — 1 lệnh kiểu `modal run` (CLI bổ trợ)
+
+Repo có sẵn `tools/alo-run.py` — push + **stream log live** + tự tải output về, dùng đúng account **Active** của app (không nhập lại key). Cách cài shim vào PATH:
+
+```powershell
+# tạo alo-run.cmd trong 1 thư mục đã có trên PATH, ví dụ Python\Scripts
+Set-Content "$env:LOCALAPPDATA\Programs\Python\Python311\Scripts\alo-run.cmd" `
+  '@python -u "%~dp0..\..\Documents\GitHub\Alo_Gpu\tools\alo-run.py" %*'
+```
+
+Hoặc chạy trực tiếp: `python tools\alo-run.py <file.py|.ipynb|folder>`. Một số cách dùng:
+
+```bash
+alo-run train_script.py                     # GPU T4 x2 mặc định
+alo-run train_script.py --acc NvidiaH100    # GPU mạnh hơn
+alo-run train_script.py --cpu               # phiên bản CPU
+alo-run train_script.py --dataset user/my-data   # mount /kaggle/input/my-data
+alo-run train_script.py --no-push           # reattach — xem lại log run đang chạy
+alo-run train_script.py --no-watch          # chỉ push rồi thoát
+```
+
+Rerun cùng slug = **version mới**; `Ctrl+C` = detach (run vẫn chạy trên Kaggle) — reattach bằng `--no-push`. Output mặc định về `<code folder>/alo-output/`.
 
 ## 📦 Build bản release
 
