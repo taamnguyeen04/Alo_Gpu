@@ -1,119 +1,124 @@
-# Shadcn Admin Dashboard
+﻿# AloGPU
 
-Admin Dashboard UI crafted with Shadcn and Vite. Built with responsiveness and accessibility in mind.
+Ứng dụng desktop quản lý các dịch vụ ML cloud của bạn — hiện tại là **Modal** (workspaces, apps, volumes, secrets, TensorBoard, billing), và đang trong kế hoạch bổ sung **Kaggle** (datasets, notebooks).
 
-![alt text](public/images/shadcn-admin.png)
+Phía backend Rust không gọi API trực tiếp mà bọc **Modal CLI** (`modal`), tự động đổi workspace qua biến môi trường `MODAL_PROFILE` → mọi hành động đều dùng đúng profile/modal account đã đăng nhập trên máy bạn.
 
-[![Sponsored by Clerk](https://img.shields.io/badge/Sponsored%20by-Clerk-5b6ee1?logo=clerk)](https://go.clerk.com/GttUAaK)
+Được xây dựng trên **Tauri 2 + React + shadcn/ui** (dựa trên template [shadcn-admin](https://github.com/satnaing/shadcn-admin)).
 
-I've been creating dashboard UIs at work and for my personal projects. I always wanted to make a reusable collection of dashboard UI for future projects; and here it is now. While I've created a few custom components, some of the code is directly adapted from ShadcnUI examples.
+## ✨ Tính năng
 
-> This is not a starter project (template) though. I'll probably make one in the future.
+- **Workspaces** — xem tất cả Modal profiles, credits còn lại của từng workspace, ghi chú tự lưu, đổi profile bằng 1 click, sort theo tên/credits
+- **Apps** — danh sách apps, xem logs live (tự động refetch + tích lũy, tìm overlap tránh mất log), xóa app, ước lượng thời lượng train từ GPU đang dùng & credits
+- **Volumes** — duyệt/tải/xóa file trong volume, upload file & thư mục, tạo/xóa volume
+- **Secrets** — tạo secret với key/value, xóa secret
+- **TensorBoard** — chọn thư mục log cục bộ, app tự khởi động TensorBoard local và nhúng iframe
+- **GPU Pricing / Billing** — tra giá GPU theo giờ, cập nhật costs hàng loạt cho mọi workspace
 
-## Features
+## 📋 Yêu cầu hệ thống
 
-- Light/dark mode
-- Responsive
-- Accessible
-- With built-in Sidebar component
-- Global search command
-- 10+ pages
-- Extra custom components
-- RTL support
+| Thành phần                                        | Yêu cầu                      | Ghi chú                                                                        |
+| ------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------ |
+| Hệ điều hành                                      | Windows 10/11                | Bundle hiện là MSI/NSIS, TensorBoard dùng `taskkill` (Windows-only)            |
+| Node.js                                           | ≥ 20.19 (khuyến nghị LTS 22) | kèm npm 10+                                                                    |
+| Rust                                              | stable ≥ 1.77.2              | cài qua [rustup](https://rustup.rs/)                                           |
+| VS C++ Build Tools                                | bắt buộc trên Windows        | để compile Tauri (xem [prerequisites](https://tauri.app/start/prerequisites/)) |
+| [Modal CLI](https://modal.com/docs/reference/cli) | mới nhất                     | `pip install modal` rồi `modal setup` để đăng nhập                             |
+| Python + TensorBoard                              | tùy chọn                     | chỉ cần khi dùng tab TensorBoard: `pip install tensorboard`                    |
 
-<details>
-<summary>Customized Components (click to expand)</summary>
-
-This project uses Shadcn UI components, but some have been slightly modified for better RTL (Right-to-Left) support and other improvements. These customized components differ from the original Shadcn UI versions.
-
-If you want to update components using the Shadcn CLI (e.g., `npx shadcn@latest add <component>`), it's generally safe for non-customized components. For the listed customized ones, you may need to manually merge changes to preserve the project's modifications and avoid overwriting RTL support or other updates.
-
-> If you don't require RTL support, you can safely update the 'RTL Updated Components' via the Shadcn CLI, as these changes are primarily for RTL compatibility. The 'Modified Components' may have other customizations to consider.
-
-### Modified Components
-
-- scroll-area
-- sonner
-- separator
-
-### RTL Updated Components
-
-- alert-dialog
-- calendar
-- command
-- dialog
-- dropdown-menu
-- select
-- table
-- sheet
-- sidebar
-- switch
-
-**Notes:**
-
-- **Modified Components**: These have general updates, potentially including RTL adjustments.
-- **RTL Updated Components**: These have specific changes for RTL language support (e.g., layout, positioning).
-- For implementation details, check the source files in `src/components/ui/`.
-- All other Shadcn UI components in the project are standard and can be safely updated via the CLI.
-
-</details>
-
-## Tech Stack
-
-**UI:** [ShadcnUI](https://ui.shadcn.com) (TailwindCSS + RadixUI)
-
-**Build Tool:** [Vite](https://vitejs.dev/)
-
-**Routing:** [TanStack Router](https://tanstack.com/router/latest)
-
-**Type Checking:** [TypeScript](https://www.typescriptlang.org/)
-
-**Linting/Formatting:** [ESLint](https://eslint.org/) & [Prettier](https://prettier.io/)
-
-**Icons:** [Lucide Icons](https://lucide.dev/icons/), [Tabler Icons](https://tabler.io/icons) (Brand icons only)
-
-**Auth (partial):** [Clerk](https://go.clerk.com/GttUAaK)
-
-## Run Locally
-
-Clone the project
+Kiểm tra đã đủ điều kiện:
 
 ```bash
-  git clone https://github.com/satnaing/shadcn-admin.git
+node -v          # >= 20.19
+cargo --version  # >= 1.77
+modal profile list  # phải trả về ít nhất 1 profile đã login
 ```
 
-Go to the project directory
+## 🚀 Cài đặt
 
 ```bash
-  cd shadcn-admin
+# 1. Clone repo
+git clone https://github.com/taamnguyeen04/Alo_Gpu.git
+cd Alo_Gpu
+
+# 2. Cài dependencies frontend
+npm install
 ```
 
-Install dependencies
+### Chế độ phát triển (desktop app)
 
 ```bash
-  pnpm install
+npm run tauri:dev
 ```
 
-Start the server
+Lệnh này sẽ khởi động Vite dev server ở `localhost:5173` và mở cửa sổ app Tauri phía trên. Với app desktop, luôn chạy qua `npm run tauri:dev` (không dùng `npm run dev` một mình vì thiếu backend Rust).
+
+### Chạy riêng phần UI (frontend only)
 
 ```bash
-  pnpm run dev
+npm run dev
 ```
 
-## Sponsoring this project ❤️
+Xem UI trên browser tại `http://localhost:5173` — các nút cần Tauri invoke sẽ báo lỗi (bình thường, vì không có backend desktop).
 
-If you find this project helpful or use this in your own work, consider [sponsoring me](https://github.com/sponsors/satnaing) to support development and maintenance. You can [buy me a coffee](https://buymeacoffee.com/satnaing) as well. Don’t worry, every penny helps. Thank you! 🙏
+## 📦 Build bản release
 
-For questions or sponsorship inquiries, feel free to reach out at [satnaingdev@gmail.com](mailto:satnaingdev@gmail.com).
+```bash
+npm run tauri:build
+```
 
-### Current Sponsor
+Kết quả:
 
-- [Clerk](https://go.clerk.com/GttUAaK) - authentication and user management for the modern web
+- Binary: `src-tauri/target/release/alogpu.exe`
+- Installer: `src-tauri/target/release/bundle/` (MSI + NSIS `.exe`)
 
-## Author
+Build tự động chạy **typecheck** (`tsc -b`) trước khi đóng gói theo cấu hình `build` hiện tại.
 
-Crafted with 🤍 by [@satnaing](https://github.com/satnaing)
+## 🧪 Kiểm thử / Lint
 
-## License
+```bash
+npm run test:browser:install   # cài Chromium cho Playwright (lần đầu)
+npm test                       # chạy vitest (browser mode)
+npm run lint                   # eslint
+npm run format:check           # prettier --check
+```
 
-Licensed under the [MIT License](https://choosealicense.com/licenses/mit/)
+## 🛠️ Scripts
+
+| Script                                                  | Mô tả                                |
+| ------------------------------------------------------- | ------------------------------------ |
+| `npm run dev`                                           | Vite dev server (frontend only)      |
+| `npm run tauri:dev`                                     | Chạy desktop app ở chế độ dev        |
+| `npm run tauri:build`                                   | Build app + installer (MSI/NSIS)     |
+| `npm run build`                                         | Typecheck + build frontend (`dist/`) |
+| `npm run lint`                                          | ESLint                               |
+| `npm run format` / `format:check`                       | Prettier                             |
+| `npm test` (+ `test:watch`, `test:ui`, `test:coverage`) | Vitest browser mode                  |
+
+## 📁 Cấu trúc chính
+
+```
+src-tauri/                  # Backend Tauri (Rust)
+  src/commands/             # Từng nhóm lệnh: app, volume, secret, billing, tensorboard, profile, system
+  tauri.conf.json           # Cấu hình cửa sổ, bundle, plugins
+src/features/               # Các màn hình (workspaces, apps-modal, volumes, secrets, tensorboard, settings, dashboard, errors)
+src/hooks/use-modal.ts      # React Query hooks gọi Tauri invoke
+src/lib/modal-api.ts        # Wrapper invoke + types (modal-types.ts)
+src/routes/                 # TanStack Router (file-based)
+src/components/             # UI dùng chung (shadcn/ui + layout)
+```
+
+## 🔧 Xử lý lỗi thường gặp
+
+| Hiện tượng                                            | Nguyên nhân / Cách xử lý                                                                                              |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `Failed to execute modal` / lệnh không nhận diện được | Modal CLI chưa cài hoặc không có trong PATH: `pip install modal`                                                      |
+| Danh sách profile trống                               | Chưa đăng nhập: chạy `modal setup`, kiểm tra `modal profile list`                                                     |
+| Build Rust lỗi trên Windows                           | Thiếu VS C++ Build Tools hoặc Rust toolchain — làm theo [Tauri prerequisites](https://tauri.app/start/prerequisites/) |
+| TensorBoard không khởi động                           | Chưa cài TensorBoard cục bộ: `pip install tensorboard`                                                                |
+| Logs không tự cập nhật                                | App refetch mỗi 5s — kiểm tra app thật vẫn đang chạy, hoặc bấm **Refresh** trong dialog                               |
+
+## 📄 Ghi chú
+
+- UI base từ template MIT [shadcn-admin](https://github.com/satnaing/shadcn-admin); phần giao diện demo (auth/pages/tasks/users/chats) đã được lược bỏ, thay bằng các màn hình Modal thật.
+- Token/credentials Modal không bị lưu trong app — chỉ đọc thông qua Modal CLI đã đăng nhập trên máy.
