@@ -4,11 +4,16 @@ import { Button } from '@/components/ui/button'
 
 type GeneralErrorProps = React.HTMLAttributes<HTMLDivElement> & {
   minimal?: boolean
+  error?: {
+    message?: string
+    stack?: string
+  }
 }
 
 export function GeneralError({
   className,
   minimal = false,
+  error,
 }: GeneralErrorProps) {
   const navigate = useNavigate()
   const { history } = useRouter()
@@ -22,6 +27,18 @@ export function GeneralError({
         <p className='text-center text-muted-foreground'>
           We apologize for the inconvenience. <br /> Please try again later.
         </p>
+        {error && (
+          <div className='my-4 max-w-[80%] overflow-auto rounded bg-red-100 p-4 text-red-900'>
+            <p className='font-mono text-sm'>
+              {error.message || String(error)}
+            </p>
+            {error.stack && (
+              <pre className='mt-2 text-left text-xs whitespace-pre-wrap'>
+                {error.stack}
+              </pre>
+            )}
+          </div>
+        )}
         {!minimal && (
           <div className='mt-6 flex gap-4'>
             <Button variant='outline' onClick={() => history.go(-1)}>
