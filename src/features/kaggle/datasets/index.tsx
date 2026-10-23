@@ -1,13 +1,8 @@
 import { useEffect, useState } from 'react'
-import {
-  Database,
-  ExternalLink,
-  Eye,
-  RotateCw,
-  Upload,
-} from 'lucide-react'
-import { useKaggleAccounts, useKaggleDatasets } from '@/hooks/use-kaggle'
+import { Database, ExternalLink, Eye, RotateCw, Upload } from 'lucide-react'
 import { useKaggleStore } from '@/stores/kaggle-store'
+import type { KaggleDataset } from '@/lib/kaggle-types'
+import { useKaggleAccounts, useKaggleDatasets } from '@/hooks/use-kaggle'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -32,7 +27,6 @@ import { Main } from '@/components/layout/main'
 import { DatasetFilesDialog } from './components/dataset-files-dialog'
 import { UploadDatasetDialog } from './components/upload-dataset-dialog'
 import { fmtBytes } from './fmt'
-import type { KaggleDataset } from '@/lib/kaggle-types'
 
 export function KaggleDatasetsPage() {
   const { data: accounts } = useKaggleAccounts()
@@ -60,7 +54,9 @@ export function KaggleDatasetsPage() {
     isRefetching,
   } = useKaggleDatasets(accountId || undefined)
 
-  const [selectedDataset, setSelectedDataset] = useState<KaggleDataset | null>(null)
+  const [selectedDataset, setSelectedDataset] = useState<KaggleDataset | null>(
+    null
+  )
   const [showUpload, setShowUpload] = useState(false)
 
   return (
@@ -86,13 +82,22 @@ export function KaggleDatasetsPage() {
           </Select>
         </div>
         <div className='flex items-center gap-2'>
-          <Button variant='outline' size='sm' onClick={() => void refetch()} disabled={isRefetching}>
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => void refetch()}
+            disabled={isRefetching}
+          >
             <RotateCw
               className={`mr-2 h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`}
             />
             Refresh
           </Button>
-          <Button size='sm' onClick={() => setShowUpload(true)} disabled={!accountId}>
+          <Button
+            size='sm'
+            onClick={() => setShowUpload(true)}
+            disabled={!accountId}
+          >
             <Upload className='mr-2 h-4 w-4' />
             Upload Dataset
           </Button>
@@ -103,7 +108,8 @@ export function KaggleDatasetsPage() {
         <div className='mb-6'>
           <h1 className='text-2xl font-bold tracking-tight'>Kaggle Datasets</h1>
           <p className='text-muted-foreground'>
-            Upload training data, then reference it as a dataset source in your kernel runs
+            Upload training data, then reference it as a dataset source in your
+            kernel runs
           </p>
         </div>
 
@@ -121,8 +127,10 @@ export function KaggleDatasetsPage() {
           <Card>
             <CardContent className='flex flex-col items-center justify-center py-10'>
               <Database className='mb-4 h-12 w-12 text-muted-foreground' />
-              <h3 className='mb-2 text-lg font-semibold'>Failed to list datasets</h3>
-              <p className='max-w-xl break-all text-center text-sm text-muted-foreground'>
+              <h3 className='mb-2 text-lg font-semibold'>
+                Failed to list datasets
+              </h3>
+              <p className='max-w-xl text-center text-sm break-all text-muted-foreground'>
                 {String(error)}
               </p>
             </CardContent>
@@ -162,7 +170,9 @@ export function KaggleDatasetsPage() {
                                 <ExternalLink className='h-3.5 w-3.5' />
                               </a>
                             </div>
-                            <div className='text-sm text-muted-foreground'>{d.ref}</div>
+                            <div className='text-sm text-muted-foreground'>
+                              {d.ref}
+                            </div>
                           </div>
                         </div>
                       </TableCell>
@@ -203,7 +213,11 @@ export function KaggleDatasetsPage() {
                 Upload a local folder as a private dataset — use it later as a
                 dataset source for your GPU kernel runs.
               </p>
-              <Button size='sm' onClick={() => setShowUpload(true)} disabled={!accountId}>
+              <Button
+                size='sm'
+                onClick={() => setShowUpload(true)}
+                disabled={!accountId}
+              >
                 <Upload className='mr-2 h-4 w-4' />
                 Upload Dataset
               </Button>
@@ -214,7 +228,9 @@ export function KaggleDatasetsPage() {
         {/* No accounts hint */}
         {!isLoading && managedAccounts.length === 0 && (
           <div className='mt-4 flex justify-center'>
-            <Badge variant='secondary'>Add a Kaggle account first (Accounts page)</Badge>
+            <Badge variant='secondary'>
+              Add a Kaggle account first (Accounts page)
+            </Badge>
           </div>
         )}
       </Main>

@@ -1,11 +1,8 @@
 import { useMemo, useState } from 'react'
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { FolderOpen, Loader2, Play } from 'lucide-react'
 import { toast } from 'sonner'
-import { open as openDialog } from '@tauri-apps/plugin-dialog'
-import {
-  useKaggleFolderFiles,
-  usePushKaggleKernel,
-} from '@/hooks/use-kaggle'
+import { useKaggleFolderFiles, usePushKaggleKernel } from '@/hooks/use-kaggle'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -68,8 +65,12 @@ export function NewRunDialog({
   const [slugDraft, setSlugDraft] = useState('')
   const [slugTouched, setSlugTouched] = useState(false)
   const slug = slugTouched ? slugDraft : slugify(title)
-  const [languageManual, setLanguageManual] = useState<'python' | 'r' | null>(null)
-  const [kernelTypeManual, setKernelTypeManual] = useState<'notebook' | 'script' | null>(null)
+  const [languageManual, setLanguageManual] = useState<'python' | 'r' | null>(
+    null
+  )
+  const [kernelTypeManual, setKernelTypeManual] = useState<
+    'notebook' | 'script' | null
+  >(null)
   const [accelerator, setAccelerator] = useState('NvidiaTeslaT4')
   const [isPrivate, setIsPrivate] = useState(true)
   const [enableInternet, setEnableInternet] = useState(true)
@@ -81,16 +82,25 @@ export function NewRunDialog({
   // List local files to choose the code file
   const { data: folderFiles } = useKaggleFolderFiles(folder || undefined)
   const codeFiles = useMemo(
-    () => (folderFiles || []).filter((f) => CODE_EXTENSIONS.some((ext) => f.toLowerCase().endsWith(ext.toLowerCase()))),
+    () =>
+      (folderFiles || []).filter((f) =>
+        CODE_EXTENSIONS.some((ext) =>
+          f.toLowerCase().endsWith(ext.toLowerCase())
+        )
+      ),
     [folderFiles]
   )
   const [codeSelection, setCodeSelection] = useState('')
   const selectedCodeFile =
     codeFiles.length > 0 && codeFiles.includes(codeSelection)
       ? codeSelection
-      : (codeFiles.find((f) => f.toLowerCase().endsWith('.ipynb')) ?? codeFiles[0] ?? '')
+      : (codeFiles.find((f) => f.toLowerCase().endsWith('.ipynb')) ??
+        codeFiles[0] ??
+        '')
   // Infer language/type from the selected file extension unless the user overrides them
-  const inferredLanguage: 'python' | 'r' = /\.(r|rmd)$/i.test(selectedCodeFile) ? 'r' : 'python'
+  const inferredLanguage: 'python' | 'r' = /\.(r|rmd)$/i.test(selectedCodeFile)
+    ? 'r'
+    : 'python'
   const language = languageManual ?? inferredLanguage
   const inferredKernelType: 'notebook' | 'script' = selectedCodeFile
     .toLowerCase()
@@ -191,8 +201,8 @@ export function NewRunDialog({
         <DialogHeader>
           <DialogTitle>New Run</DialogTitle>
           <DialogDescription>
-            App writes <code>kernel-metadata.json</code> into the chosen folder and
-            pushes to Kaggle — it runs on the selected accelerator.
+            App writes <code>kernel-metadata.json</code> into the chosen folder
+            and pushes to Kaggle — it runs on the selected accelerator.
           </DialogDescription>
         </DialogHeader>
 
@@ -201,7 +211,11 @@ export function NewRunDialog({
           <div className='grid gap-2'>
             <Label>Code folder</Label>
             <div className='flex gap-2'>
-              <Button variant='outline' onClick={() => void chooseFolder()} disabled={isPending}>
+              <Button
+                variant='outline'
+                onClick={() => void chooseFolder()}
+                disabled={isPending}
+              >
                 <FolderOpen className='mr-2 h-4 w-4' />
                 Browse…
               </Button>
@@ -277,7 +291,9 @@ export function NewRunDialog({
               <Label>Type</Label>
               <Select
                 value={kernelType}
-                onValueChange={(v) => setKernelTypeManual(v as 'notebook' | 'script')}
+                onValueChange={(v) =>
+                  setKernelTypeManual(v as 'notebook' | 'script')
+                }
                 disabled={isPending}
               >
                 <SelectTrigger>
@@ -307,7 +323,11 @@ export function NewRunDialog({
             </div>
             <div className='grid gap-2'>
               <Label>Accelerator</Label>
-              <Select value={accelerator} onValueChange={setAccelerator} disabled={isPending}>
+              <Select
+                value={accelerator}
+                onValueChange={setAccelerator}
+                disabled={isPending}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -325,7 +345,10 @@ export function NewRunDialog({
           {/* Options */}
           <div className='grid gap-3 sm:grid-cols-2'>
             <div className='flex items-center justify-between rounded-lg border px-3 py-2'>
-              <Label htmlFor='kernel-private' className='cursor-pointer text-sm font-normal'>
+              <Label
+                htmlFor='kernel-private'
+                className='cursor-pointer text-sm font-normal'
+              >
                 Private
               </Label>
               <Switch
@@ -336,7 +359,10 @@ export function NewRunDialog({
               />
             </div>
             <div className='flex items-center justify-between rounded-lg border px-3 py-2'>
-              <Label htmlFor='kernel-internet' className='cursor-pointer text-sm font-normal'>
+              <Label
+                htmlFor='kernel-internet'
+                className='cursor-pointer text-sm font-normal'
+              >
                 Internet
               </Label>
               <Switch
@@ -347,7 +373,10 @@ export function NewRunDialog({
               />
             </div>
             <div className='flex items-center justify-between rounded-lg border px-3 py-2'>
-              <Label htmlFor='kernel-runnnow' className='cursor-pointer text-sm font-normal'>
+              <Label
+                htmlFor='kernel-runnnow'
+                className='cursor-pointer text-sm font-normal'
+              >
                 Run immediately
               </Label>
               <Checkbox
@@ -384,14 +413,18 @@ export function NewRunDialog({
           </div>
 
           {error && (
-            <div className='rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive break-all'>
+            <div className='rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs break-all text-destructive'>
               {error}
             </div>
           )}
         </div>
 
         <div className='flex justify-end gap-2'>
-          <Button variant='outline' onClick={resetAndClose} disabled={isPending}>
+          <Button
+            variant='outline'
+            onClick={resetAndClose}
+            disabled={isPending}
+          >
             Cancel
           </Button>
           <Button

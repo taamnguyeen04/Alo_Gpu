@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import {
   AlertTriangle,
   Copy,
@@ -9,7 +10,6 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import {
   useDownloadKaggleKernelOutput,
   useKaggleKernelFiles,
@@ -36,7 +36,12 @@ type KernelViewerProps = {
   title: string
 }
 
-const RUNNING_STATES = ['running', 'queued', 'cancelrequested', 'cancelacknowledged']
+const RUNNING_STATES = [
+  'running',
+  'queued',
+  'cancelrequested',
+  'cancelacknowledged',
+]
 
 export function KernelViewer({
   open,
@@ -56,20 +61,26 @@ export function KernelViewer({
     {
       enabled: open,
       refetchInterval: (query) => {
-        const st =
-          ((query as { state?: { data?: { status?: string } } }).state?.data?.status ??
-            '').toLowerCase()
+        const st = (
+          (query as { state?: { data?: { status?: string } } }).state?.data
+            ?.status ?? ''
+        ).toLowerCase()
         return st && RUNNING_STATES.some((s) => st.includes(s)) ? 5000 : false
       },
     }
   )
   const isRunning =
-    !!status && RUNNING_STATES.some((s) => status.status.toLowerCase().includes(s))
+    !!status &&
+    RUNNING_STATES.some((s) => status.status.toLowerCase().includes(s))
 
-  const logsQuery = useKaggleKernelLogs(accountId ?? undefined, kernelRef ?? undefined, {
-    enabled: open && tab === 'log',
-    refetchInterval: isRunning ? 5000 : false,
-  })
+  const logsQuery = useKaggleKernelLogs(
+    accountId ?? undefined,
+    kernelRef ?? undefined,
+    {
+      enabled: open && tab === 'log',
+      refetchInterval: isRunning ? 5000 : false,
+    }
+  )
 
   const filesQuery = useKaggleKernelFiles(
     accountId ?? undefined,
@@ -128,7 +139,8 @@ export function KernelViewer({
   const statusVariant = (s: string) => {
     const lower = s.toLowerCase()
     if (lower.includes('running') || lower.includes('queued')) return 'default'
-    if (lower.includes('complete') || lower.includes('finished')) return 'secondary'
+    if (lower.includes('complete') || lower.includes('finished'))
+      return 'secondary'
     if (lower.includes('error') || lower.includes('fail')) return 'destructive'
     return 'outline'
   }
@@ -142,7 +154,9 @@ export function KernelViewer({
               {title || kernelRef}
             </span>
             {status && (
-              <Badge variant={statusVariant(status.status)}>{status.status}</Badge>
+              <Badge variant={statusVariant(status.status)}>
+                {status.status}
+              </Badge>
             )}
             {kernelRef && (
               <a
@@ -182,12 +196,15 @@ export function KernelViewer({
                 <Skeleton className='h-4 w-1/2' />
               </div>
             ) : logsQuery.error ? (
-              <p className='py-4 text-sm text-destructive'>Failed to load log: {String(logsQuery.error)}</p>
+              <p className='py-4 text-sm text-destructive'>
+                Failed to load log: {String(logsQuery.error)}
+              </p>
             ) : logText.trim() ? (
               <>
                 <div className='mb-2 flex items-center justify-between'>
                   <span className='text-xs text-muted-foreground'>
-                    {isRunning ? 'Live (5s)' : 'Last execution'} — {logText.length.toLocaleString()} chars
+                    {isRunning ? 'Live (5s)' : 'Last execution'} —{' '}
+                    {logText.length.toLocaleString()} chars
                   </span>
                   <div className='flex gap-1'>
                     <Button
@@ -210,7 +227,7 @@ export function KernelViewer({
                     </Button>
                   </div>
                 </div>
-                <pre className='max-h-[400px] overflow-auto whitespace-pre-wrap break-words rounded-md border bg-muted/40 p-3 font-mono text-xs'>
+                <pre className='max-h-[400px] overflow-auto rounded-md border bg-muted/40 p-3 font-mono text-xs break-words whitespace-pre-wrap'>
                   {logText}
                 </pre>
               </>
@@ -223,11 +240,18 @@ export function KernelViewer({
 
           <TabsContent value='output' className='mt-3'>
             <div className='mb-2 flex items-center justify-between gap-2'>
-              <span className='min-w-0 truncate text-xs text-muted-foreground' title={outDir ?? undefined}>
+              <span
+                className='min-w-0 truncate text-xs text-muted-foreground'
+                title={outDir ?? undefined}
+              >
                 {outDir ? `→ ${outDir}` : 'No folder chosen yet'}
               </span>
               <div className='flex gap-1'>
-                <Button variant='outline' size='sm' onClick={() => void pickFolder()}>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => void pickFolder()}
+                >
                   <FolderOpen className='mr-2 h-3.5 w-3.5' />
                   Folder
                 </Button>
@@ -263,7 +287,10 @@ export function KernelViewer({
                     className='flex items-center justify-between gap-2 border-b px-3 py-2 last:border-b-0'
                   >
                     <div className='min-w-0'>
-                      <div className='truncate font-mono text-xs' title={f.name}>
+                      <div
+                        className='truncate font-mono text-xs'
+                        title={f.name}
+                      >
                         {f.name}
                       </div>
                       <div className='text-[10px] text-muted-foreground'>

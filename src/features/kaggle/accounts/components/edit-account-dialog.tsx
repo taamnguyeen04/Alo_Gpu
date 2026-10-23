@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useUpdateKaggleAccount } from '@/hooks/use-kaggle'
 import type { KaggleAccount } from '@/lib/kaggle-types'
+import { useUpdateKaggleAccount } from '@/hooks/use-kaggle'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -39,7 +39,10 @@ export function EditAccountDialog({
   const handleSave = async () => {
     if (!account) return
     try {
-      await updateAccount.mutateAsync({ accountId: account.id, label: label.trim() })
+      await updateAccount.mutateAsync({
+        accountId: account.id,
+        label: label.trim(),
+      })
       toast.success('Label updated')
       onOpenChange(false)
     } catch (error) {

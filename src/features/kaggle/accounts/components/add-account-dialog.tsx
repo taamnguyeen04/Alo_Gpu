@@ -24,7 +24,10 @@ type AddAccountDialogProps = {
   onOpenChange: (open: boolean) => void
 }
 
-export function AddAccountDialog({ open, onOpenChange }: AddAccountDialogProps) {
+export function AddAccountDialog({
+  open,
+  onOpenChange,
+}: AddAccountDialogProps) {
   const addAccount = useAddKaggleAccount()
   const addTokenAccount = useAddKaggleTokenAccount()
 
@@ -112,9 +115,13 @@ export function AddAccountDialog({ open, onOpenChange }: AddAccountDialogProps) 
                 mode === 'legacy_key' ? 'border-primary bg-primary/5' : ''
               }`}
             >
-              <RadioGroupItem value='legacy_key' id='mode-legacy' className='mt-0.5' />
+              <RadioGroupItem
+                value='legacy_key'
+                id='mode-legacy'
+                className='mt-0.5'
+              />
               <div>
-                <span className='block text-sm font-medium leading-none'>
+                <span className='block text-sm leading-none font-medium'>
                   Legacy API Key
                 </span>
                 <span className='mt-1 block text-xs text-muted-foreground'>
@@ -128,9 +135,15 @@ export function AddAccountDialog({ open, onOpenChange }: AddAccountDialogProps) 
                 mode === 'api_token' ? 'border-primary bg-primary/5' : ''
               }`}
             >
-              <RadioGroupItem value='api_token' id='mode-token' className='mt-0.5' />
+              <RadioGroupItem
+                value='api_token'
+                id='mode-token'
+                className='mt-0.5'
+              />
               <div>
-                <span className='block text-sm font-medium leading-none'>API Token</span>
+                <span className='block text-sm leading-none font-medium'>
+                  API Token
+                </span>
                 <span className='mt-1 block text-xs text-muted-foreground'>
                   Token only
                 </span>
@@ -203,14 +216,18 @@ export function AddAccountDialog({ open, onOpenChange }: AddAccountDialogProps) 
           )}
 
           {error && (
-            <div className='rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive break-all'>
+            <div className='rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs break-all text-destructive'>
               {error}
             </div>
           )}
         </div>
 
         <div className='flex justify-end gap-2'>
-          <Button variant='outline' onClick={resetAndClose} disabled={isPending}>
+          <Button
+            variant='outline'
+            onClick={resetAndClose}
+            disabled={isPending}
+          >
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={!canSave || isPending}>

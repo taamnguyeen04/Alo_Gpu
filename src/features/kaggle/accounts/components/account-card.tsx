@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, MoreHorizontal, Pencil, Trash2, UserCheck } from 'lucide-react'
+import {
+  CheckCircle2,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  UserCheck,
+} from 'lucide-react'
 import { toast } from 'sonner'
+import { useKaggleStore } from '@/stores/kaggle-store'
 import type { KaggleAccount, KaggleQuota } from '@/lib/kaggle-types'
 import {
   useKaggleQuota,
   useRemoveKaggleAccount,
   useSetKaggleActiveAccount,
 } from '@/hooks/use-kaggle'
-import { useKaggleStore } from '@/stores/kaggle-store'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,7 +54,10 @@ function quotaCacheKey(accountId: string) {
   return `kaggle_quota_${accountId}`
 }
 
-function readCachedQuota(accountId: string, cacheVersion: number): KaggleQuota[] | null {
+function readCachedQuota(
+  accountId: string,
+  cacheVersion: number
+): KaggleQuota[] | null {
   try {
     const raw = localStorage.getItem(quotaCacheKey(accountId))
     if (raw) {
@@ -88,7 +97,12 @@ function QuotaRow({ quota }: { quota: KaggleQuota }) {
     <div className='flex flex-col gap-1'>
       <div className='flex items-baseline justify-between text-xs'>
         <span className='font-medium'>{quota.resource}</span>
-        <span className={remainingColorClass(quota.remaining_hours, quota.total_hours)}>
+        <span
+          className={remainingColorClass(
+            quota.remaining_hours,
+            quota.total_hours
+          )}
+        >
           {quota.remaining_hours.toFixed(1)}h left
           <span className='ml-1 text-muted-foreground'>
             / {quota.total_hours > 0 ? `${quota.total_hours.toFixed(0)}h` : '?'}
@@ -128,11 +142,17 @@ function QuotaLive({ accountId }: { accountId: string }) {
   }, [quota, accountId])
 
   if (isLoading) {
-    return <div className='my-3 animate-pulse text-xs text-muted-foreground'>Loading quota…</div>
+    return (
+      <div className='my-3 animate-pulse text-xs text-muted-foreground'>
+        Loading quota…
+      </div>
+    )
   }
   if (!quota || quota.length === 0) {
     return (
-      <div className='my-3 text-xs italic text-muted-foreground'>No usage recorded yet</div>
+      <div className='my-3 text-xs text-muted-foreground italic'>
+        No usage recorded yet
+      </div>
     )
   }
   return (
@@ -158,13 +178,13 @@ function QuotaCached({
 
   if (!cached || cached.length === 0) {
     return (
-      <div className='my-3 text-xs italic text-muted-foreground'>
+      <div className='my-3 text-xs text-muted-foreground italic'>
         No quota cached. Use “Update All Quotas” to load.
       </div>
     )
   }
   return (
-    <div className='my-3 flex flex-col gap-3 rounded-md border bg-card p-3 shadow-sm opacity-90'>
+    <div className='my-3 flex flex-col gap-3 rounded-md border bg-card p-3 opacity-90 shadow-sm'>
       {cached.map((q) => (
         <QuotaRow key={q.resource} quota={q} />
       ))}
@@ -243,19 +263,19 @@ export function AccountCard({
 
   return (
     <Card
-      className={`cursor-pointer transition-all hover:shadow-md flex flex-col h-full ${
+      className={`flex h-full cursor-pointer flex-col transition-all hover:shadow-md ${
         isCurrent ? 'ring-2 ring-primary' : ''
       }`}
       onClick={() => setCurrentAccountId(account.id)}
     >
       <CardHeader className='pb-2'>
         <div className='flex items-start justify-between gap-2'>
-          <div className='flex items-center gap-2.5 min-w-0'>
+          <div className='flex min-w-0 items-center gap-2.5'>
             <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-sm font-bold text-primary'>
               {initial}
             </div>
             <div className='min-w-0'>
-              <CardTitle className='text-base truncate' title={displayName}>
+              <CardTitle className='truncate text-base' title={displayName}>
                 {displayName}
               </CardTitle>
               <CardDescription className='truncate' title={account.username}>
@@ -279,7 +299,9 @@ export function AccountCard({
             </DropdownMenuTrigger>
             <DropdownMenuContent align='end'>
               <DropdownMenuItem
-                disabled={!isManaged || account.is_active_global || setActive.isPending}
+                disabled={
+                  !isManaged || account.is_active_global || setActive.isPending
+                }
                 onClick={() => {
                   setMenuOpen(false)
                   void handleSetActive()
@@ -357,7 +379,7 @@ export function AccountCard({
           )}
         </div>
       </CardHeader>
-      <CardContent className='pt-0 flex flex-col justify-between h-full'>
+      <CardContent className='flex h-full flex-col justify-between pt-0'>
         <div>
           {account.is_active_global ? (
             <QuotaLive accountId={account.id} />

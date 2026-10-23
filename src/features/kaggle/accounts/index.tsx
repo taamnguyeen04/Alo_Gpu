@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Gauge,
   Loader2,
@@ -9,6 +10,7 @@ import {
   Terminal,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useKaggleStore } from '@/stores/kaggle-store'
 import * as kaggleApi from '@/lib/kaggle-api'
 import type { KaggleAccount } from '@/lib/kaggle-types'
 import {
@@ -17,13 +19,9 @@ import {
   useKaggleActiveGlobal,
   useKaggleCliAvailable,
 } from '@/hooks/use-kaggle'
-import { useKaggleStore } from '@/stores/kaggle-store'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-} from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -32,7 +30,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useQueryClient } from '@tanstack/react-query'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { AccountCard } from './components/account-card'
@@ -64,7 +61,12 @@ function readCachedRemaining(accountId: string): number | null {
 
 export function KaggleAccountsDashboard() {
   const queryClient = useQueryClient()
-  const { data: accounts, isLoading, isRefetching, refetch } = useKaggleAccounts()
+  const {
+    data: accounts,
+    isLoading,
+    isRefetching,
+    refetch,
+  } = useKaggleAccounts()
   const { data: activeGlobal } = useKaggleActiveGlobal()
   const { data: cliAvailable } = useKaggleCliAvailable()
 
@@ -74,7 +76,9 @@ export function KaggleAccountsDashboard() {
   const [cacheVersion, setCacheVersion] = useState(0)
   const [isUpdatingAll, setIsUpdatingAll] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
-  const [editingAccount, setEditingAccount] = useState<KaggleAccount | null>(null)
+  const [editingAccount, setEditingAccount] = useState<KaggleAccount | null>(
+    null
+  )
 
   // Keep store's currentAccountId valid when accounts change
   useEffect(() => {
@@ -162,7 +166,9 @@ export function KaggleAccountsDashboard() {
   }, [accounts, sortOption, cacheVersion])
 
   const showActiveBanner =
-    !!activeGlobal && activeGlobal.source !== 'none' && activeGlobal.source !== 'cli_env'
+    !!activeGlobal &&
+    activeGlobal.source !== 'none' &&
+    activeGlobal.source !== 'cli_env'
 
   return (
     <>
@@ -173,7 +179,9 @@ export function KaggleAccountsDashboard() {
             variant='outline'
             size='sm'
             onClick={handleUpdateAllQuotas}
-            disabled={isUpdatingAll || !accounts || managedAccounts.length === 0}
+            disabled={
+              isUpdatingAll || !accounts || managedAccounts.length === 0
+            }
           >
             {isUpdatingAll ? (
               <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -182,8 +190,15 @@ export function KaggleAccountsDashboard() {
             )}
             {isUpdatingAll ? 'Updating...' : 'Update All Quotas'}
           </Button>
-          <Button variant='outline' size='sm' onClick={() => void refetch()} disabled={isRefetching}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => void refetch()}
+            disabled={isRefetching}
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`}
+            />
             Refresh
           </Button>
           <Button size='sm' onClick={() => setShowAdd(true)}>
@@ -194,17 +209,19 @@ export function KaggleAccountsDashboard() {
       </Header>
 
       <Main>
-        <div className='mb-6 flex flex-col sm:flex-row gap-4 sm:items-center justify-between'>
+        <div className='mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center'>
           <div>
-            <h1 className='text-2xl font-bold tracking-tight'>Kaggle Accounts</h1>
+            <h1 className='text-2xl font-bold tracking-tight'>
+              Kaggle Accounts
+            </h1>
             <p className='text-muted-foreground'>
               Manage your Kaggle CLI accounts and monitor GPU quotas
             </p>
           </div>
 
           {totals.hasAny && (
-            <div className='bg-primary/10 border-primary/20 border px-4 py-3 rounded-lg flex flex-col min-w-[200px]'>
-              <span className='text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1'>
+            <div className='flex min-w-[200px] flex-col rounded-lg border border-primary/20 bg-primary/10 px-4 py-3'>
+              <span className='mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase'>
                 GPU Hours Left
               </span>
               <div className='flex items-baseline gap-2'>
@@ -215,7 +232,7 @@ export function KaggleAccountsDashboard() {
                   / {totals.total.toFixed(0)}h
                 </span>
               </div>
-              <span className='text-[10px] text-muted-foreground mt-1'>
+              <span className='mt-1 text-[10px] text-muted-foreground'>
                 Across managed accounts (30h/week each)
               </span>
             </div>
@@ -225,9 +242,9 @@ export function KaggleAccountsDashboard() {
         {/* Global CLI account banner */}
         {showActiveBanner && (
           <Card className='mb-6 border-primary/50 bg-primary/5'>
-            <CardContent className='pb-4 pt-4'>
+            <CardContent className='pt-4 pb-4'>
               <div className='flex flex-wrap items-center gap-3'>
-                <Badge variant='default' className='text-sm px-3 py-1'>
+                <Badge variant='default' className='px-3 py-1 text-sm'>
                   CLI Active
                 </Badge>
                 <span className='text-base font-semibold'>
@@ -250,7 +267,7 @@ export function KaggleAccountsDashboard() {
           <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
             {[...Array(4)].map((_, i) => (
               <Card key={i}>
-                <div className='p-4 flex items-center gap-2.5'>
+                <div className='flex items-center gap-2.5 p-4'>
                   <Skeleton className='h-9 w-9 rounded-md' />
                   <div className='space-y-2'>
                     <Skeleton className='h-4 w-24' />
@@ -273,15 +290,21 @@ export function KaggleAccountsDashboard() {
                 All Accounts ({accounts.length})
               </div>
               <div className='flex items-center gap-2 text-sm'>
-                <span className='text-muted-foreground hidden sm:inline'>Sort by:</span>
+                <span className='hidden text-muted-foreground sm:inline'>
+                  Sort by:
+                </span>
                 <Select value={sortOption} onValueChange={setSortOption}>
-                  <SelectTrigger className='w-[180px] h-8'>
+                  <SelectTrigger className='h-8 w-[180px]'>
                     <SelectValue placeholder='Sort by' />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value='name-asc'>Name (A-Z)</SelectItem>
-                    <SelectItem value='gpu-desc'>GPU Remaining (High to Low)</SelectItem>
-                    <SelectItem value='gpu-asc'>GPU Remaining (Low to High)</SelectItem>
+                    <SelectItem value='gpu-desc'>
+                      GPU Remaining (High to Low)
+                    </SelectItem>
+                    <SelectItem value='gpu-asc'>
+                      GPU Remaining (Low to High)
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -306,21 +329,26 @@ export function KaggleAccountsDashboard() {
             <CardContent className='flex flex-col items-center justify-center py-12'>
               {cliAvailable === false ? (
                 <>
-                  <Terminal className='h-12 w-12 text-muted-foreground mb-4' />
-                  <h3 className='text-lg font-semibold mb-2'>Kaggle CLI not installed</h3>
-                  <p className='text-muted-foreground text-center mb-4'>
+                  <Terminal className='mb-4 h-12 w-12 text-muted-foreground' />
+                  <h3 className='mb-2 text-lg font-semibold'>
+                    Kaggle CLI not installed
+                  </h3>
+                  <p className='mb-4 text-center text-muted-foreground'>
                     Install it first, then add an account here.
                   </p>
-                  <code className='bg-muted px-3 py-1 rounded text-sm'>
+                  <code className='rounded bg-muted px-3 py-1 text-sm'>
                     pipx install kaggle
                   </code>
                 </>
               ) : (
                 <>
-                  <Trophy className='h-12 w-12 text-muted-foreground mb-4' />
-                  <h3 className='text-lg font-semibold mb-2'>No Kaggle accounts yet</h3>
-                  <p className='text-muted-foreground text-center mb-4'>
-                    Add your first account with the API key from kaggle.com/settings/api.
+                  <Trophy className='mb-4 h-12 w-12 text-muted-foreground' />
+                  <h3 className='mb-2 text-lg font-semibold'>
+                    No Kaggle accounts yet
+                  </h3>
+                  <p className='mb-4 text-center text-muted-foreground'>
+                    Add your first account with the API key from
+                    kaggle.com/settings/api.
                   </p>
                   <Button size='sm' onClick={() => setShowAdd(true)}>
                     <Plus className='mr-2 h-4 w-4' />

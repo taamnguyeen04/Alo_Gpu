@@ -1,12 +1,12 @@
 import { useState } from 'react'
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { FolderOpen, Loader2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
-import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import type { KaggleDataset } from '@/lib/kaggle-types'
 import {
   useCreateKaggleDataset,
   useCreateKaggleDatasetVersion,
 } from '@/hooks/use-kaggle'
-import type { KaggleDataset } from '@/lib/kaggle-types'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -177,7 +177,11 @@ export function UploadDatasetDialog({
       <div className='grid gap-2'>
         <Label>Files folder</Label>
         <div className='flex gap-2'>
-          <Button variant='outline' onClick={() => void chooseFolder(target)} disabled={isPending}>
+          <Button
+            variant='outline'
+            onClick={() => void chooseFolder(target)}
+            disabled={isPending}
+          >
             <FolderOpen className='mr-2 h-4 w-4' />
             Browse…
           </Button>
@@ -189,7 +193,8 @@ export function UploadDatasetDialog({
           </span>
         </div>
         <span className='text-[10px] text-muted-foreground'>
-          All files are uploaded; subfolders are skipped (flatten your data files).
+          All files are uploaded; subfolders are skipped (flatten your data
+          files).
         </span>
       </div>
     )
@@ -201,8 +206,13 @@ export function UploadDatasetDialog({
         <DialogHeader>
           <DialogTitle>Upload Dataset</DialogTitle>
           <DialogDescription>
-            App writes <code>dataset-metadata.json</code> and uploads the folder via
-            <code> kaggle datasets {"{"}create,version{"}"}</code>.
+            App writes <code>dataset-metadata.json</code> and uploads the folder
+            via
+            <code>
+              {' '}
+              kaggle datasets {'{'}create,version{'}'}
+            </code>
+            .
           </DialogDescription>
         </DialogHeader>
 
@@ -221,7 +231,9 @@ export function UploadDatasetDialog({
             >
               <RadioGroupItem value='new' id='mode-new' className='mt-0.5' />
               <div>
-                <span className='block text-sm font-medium leading-none'>New dataset</span>
+                <span className='block text-sm leading-none font-medium'>
+                  New dataset
+                </span>
                 <span className='mt-1 block text-xs text-muted-foreground'>
                   First upload
                 </span>
@@ -233,9 +245,15 @@ export function UploadDatasetDialog({
                 mode === 'version' ? 'border-primary bg-primary/5' : ''
               }`}
             >
-              <RadioGroupItem value='version' id='mode-version' className='mt-0.5' />
+              <RadioGroupItem
+                value='version'
+                id='mode-version'
+                className='mt-0.5'
+              />
               <div>
-                <span className='block text-sm font-medium leading-none'>New version</span>
+                <span className='block text-sm leading-none font-medium'>
+                  New version
+                </span>
                 <span className='mt-1 block text-xs text-muted-foreground'>
                   Update existing files
                 </span>
@@ -249,7 +267,9 @@ export function UploadDatasetDialog({
 
               <div className='grid gap-4 sm:grid-cols-2'>
                 <div className='grid gap-2'>
-                  <Label htmlFor='dataset-title'>Title ({DATASET_TITLE_HINT})</Label>
+                  <Label htmlFor='dataset-title'>
+                    Title ({DATASET_TITLE_HINT})
+                  </Label>
                   <Input
                     id='dataset-title'
                     placeholder='Train data v1'
@@ -259,7 +279,9 @@ export function UploadDatasetDialog({
                   />
                 </div>
                 <div className='grid gap-2'>
-                  <Label htmlFor='dataset-slug'>Slug ({DATASET_TITLE_HINT})</Label>
+                  <Label htmlFor='dataset-slug'>
+                    Slug ({DATASET_TITLE_HINT})
+                  </Label>
                   <Input
                     id='dataset-slug'
                     placeholder='train-data-v1'
@@ -277,7 +299,11 @@ export function UploadDatasetDialog({
               <div className='grid gap-4 sm:grid-cols-2'>
                 <div className='grid gap-2'>
                   <Label>License</Label>
-                  <Select value={license} onValueChange={setLicense} disabled={isPending}>
+                  <Select
+                    value={license}
+                    onValueChange={setLicense}
+                    disabled={isPending}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -291,7 +317,10 @@ export function UploadDatasetDialog({
                   </Select>
                 </div>
                 <div className='flex items-center justify-between rounded-lg border px-3 py-2'>
-                  <Label htmlFor='dataset-public' className='cursor-pointer text-sm font-normal'>
+                  <Label
+                    htmlFor='dataset-public'
+                    className='cursor-pointer text-sm font-normal'
+                  >
                     Public
                   </Label>
                   <Switch
@@ -307,7 +336,11 @@ export function UploadDatasetDialog({
             <>
               <div className='grid gap-2'>
                 <Label>Dataset to update</Label>
-                <Select value={datasetRef} onValueChange={setDatasetRef} disabled={isPending}>
+                <Select
+                  value={datasetRef}
+                  onValueChange={setDatasetRef}
+                  disabled={isPending}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder='Select dataset' />
                   </SelectTrigger>
@@ -338,14 +371,18 @@ export function UploadDatasetDialog({
           )}
 
           {error && (
-            <div className='rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive break-all'>
+            <div className='rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs break-all text-destructive'>
               {error}
             </div>
           )}
         </div>
 
         <div className='flex justify-end gap-2'>
-          <Button variant='outline' onClick={resetAndClose} disabled={isPending}>
+          <Button
+            variant='outline'
+            onClick={resetAndClose}
+            disabled={isPending}
+          >
             Cancel
           </Button>
           <Button onClick={handleUpload} disabled={isPending}>

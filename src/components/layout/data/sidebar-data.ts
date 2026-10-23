@@ -9,9 +9,9 @@ import {
   Database,
   FileCode,
 } from 'lucide-react'
-import type { SidebarData } from '../types'
-import { ModalLogo } from '@/components/logos/modal-logo'
 import { KaggleLogo } from '@/components/logos/kaggle-logo'
+import { ModalLogo } from '@/components/logos/modal-logo'
+import type { SidebarData } from '../types'
 
 export const sidebarData: SidebarData = {
   user: {

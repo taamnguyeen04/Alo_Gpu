@@ -39,9 +39,7 @@ export function NavGroup({ title, logo: Logo, items }: NavGroupProps) {
   return (
     <SidebarGroup>
       <SidebarGroupLabel className='flex items-center gap-1.5'>
-        {Logo && (
-          <Logo className='h-4 w-4 shrink-0 opacity-80' />
-        )}
+        {Logo && <Logo className='h-4 w-4 shrink-0 opacity-80' />}
         <span>{title}</span>
       </SidebarGroupLabel>
       <SidebarMenu>

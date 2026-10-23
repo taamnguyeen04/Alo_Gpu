@@ -1,7 +1,7 @@
 import { useState } from 'react'
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { Download, ExternalLink, FolderOpen, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import {
   useDownloadKaggleDataset,
   useKaggleDatasetFiles,
@@ -87,7 +87,10 @@ export function DatasetFilesDialog({
       <DialogContent className='max-w-2xl'>
         <DialogHeader>
           <DialogTitle className='flex flex-wrap items-center gap-2'>
-            <span className='truncate' title={datasetTitle || datasetRef || undefined}>
+            <span
+              className='truncate'
+              title={datasetTitle || datasetRef || undefined}
+            >
               {datasetTitle || datasetRef}
             </span>
             {datasetRef && (
@@ -116,7 +119,10 @@ export function DatasetFilesDialog({
           </span>
           <div className='flex items-center gap-3'>
             <div className='flex items-center gap-2'>
-              <Label htmlFor='dataset-unzip' className='cursor-pointer text-xs font-normal'>
+              <Label
+                htmlFor='dataset-unzip'
+                className='cursor-pointer text-xs font-normal'
+              >
                 Unzip
               </Label>
               <Switch
@@ -126,7 +132,11 @@ export function DatasetFilesDialog({
                 disabled={downloadMutation.isPending}
               />
             </div>
-            <Button variant='outline' size='sm' onClick={() => void pickFolder()}>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => void pickFolder()}
+            >
               <FolderOpen className='mr-2 h-3.5 w-3.5' />
               Folder
             </Button>
@@ -165,7 +175,9 @@ export function DatasetFilesDialog({
                     {f.name}
                   </div>
                   <div className='text-[10px] text-muted-foreground'>
-                    {/^\d+$/.test(f.size) ? fmtBytes(Number(f.size)) : f.size || '—'}
+                    {/^\d+$/.test(f.size)
+                      ? fmtBytes(Number(f.size))
+                      : f.size || '—'}
                     {f.creation_date ? ` • ${f.creation_date}` : ''}
                   </div>
                 </div>
