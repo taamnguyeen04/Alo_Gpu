@@ -13,7 +13,8 @@ export interface KaggleAccount {
 
 export interface KaggleActiveGlobal {
   username: string
-  source: 'env_token' | 'access_token' | 'legacy_key' | 'oauth' | 'cli_env' | 'none'
+  source:
+    'env_token' | 'access_token' | 'legacy_key' | 'oauth' | 'cli_env' | 'none'
 }
 
 export interface KaggleQuota {
@@ -74,4 +75,43 @@ export interface KaggleDatasetFile {
   name: string
   size: string
   creation_date: string
+}
+
+// --- AloRun: modal-run style (M4) ---
+
+export interface KaggleProjectScan {
+  root: string
+  file_count: number
+  total_bytes: number
+  entrypoints: string[] // project-relative posix .py paths
+  requirements: string // 'requirements.txt' or ''
+  pyproject: string // 'pyproject.toml' or ''
+  over_limit: boolean
+  warnings: string[]
+}
+
+export interface KaggleRunProjectConfig {
+  title: string
+  slug: string
+  entrypoint: string // relative posix .py (script mode) or '' in module mode
+  module: string // package/module name or '' in script mode
+  requirements: string // relative path to requirements.txt / pyproject.toml or ''
+  extra_packages: string[]
+  dataset_sources: string[]
+  secrets: string[]
+  args: string[]
+  output_paths: string[]
+  accelerator: string // machine_shape or '' (CPU)
+  enable_internet: boolean
+  no_run: boolean
+}
+
+export interface KaggleRunProjectResult {
+  kernel: string // owner/slug
+  title: string
+  transport: string // "embedded" | "private_dataset:<owner/slug>"
+  file_count: number
+  source_bytes: number
+  runner_bytes: number
+  message: string // CLI push output (contains the Kaggle URL)
 }

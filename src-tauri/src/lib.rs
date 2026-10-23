@@ -64,6 +64,9 @@ pub fn run() {
             commands::kaggle::kaggle_kernel_push,
             commands::kaggle::kaggle_kernel_output_download,
             commands::kaggle::kaggle_list_folder_files,
+            // Kaggle alo-run (modal-run style)
+            commands::kaggle::kaggle_scan_project,
+            commands::kaggle::kaggle_run_project,
             // Kaggle datasets
             commands::kaggle::kaggle_datasets,
             commands::kaggle::kaggle_dataset_files,

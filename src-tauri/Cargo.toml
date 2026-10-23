@@ -28,3 +28,6 @@ tokio = { version = "1", features = ["full"] }
 dirs = "5"
 uuid = { version = "1.20.0", features = ["v4"] }
 base64 = "0.23.1"
+tar = "0.4"
+flate2 = "1"
+sha2 = "0.10"

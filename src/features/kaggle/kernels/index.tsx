@@ -6,10 +6,12 @@ import {
   Loader2,
   Play,
   RotateCw,
+  Rocket,
   ThumbsUp,
 } from 'lucide-react'
-import { useKaggleAccounts, useKaggleKernels } from '@/hooks/use-kaggle'
 import { useKaggleStore } from '@/stores/kaggle-store'
+import type { KaggleKernel, KaggleRunProjectResult } from '@/lib/kaggle-types'
+import { useKaggleAccounts, useKaggleKernels } from '@/hooks/use-kaggle'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -33,7 +35,7 @@ import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { KernelViewer } from './components/kernel-viewer'
 import { NewRunDialog } from './components/new-run-dialog'
-import type { KaggleKernel } from '@/lib/kaggle-types'
+import { RunProjectDialog } from './components/run-project-dialog'
 
 export function KaggleKernelsPage() {
   const { data: accounts } = useKaggleAccounts()
@@ -63,8 +65,22 @@ export function KaggleKernelsPage() {
     isRefetching,
   } = useKaggleKernels(accountId || undefined)
 
-  const [selectedKernel, setSelectedKernel] = useState<KaggleKernel | null>(null)
+  const [selectedKernel, setSelectedKernel] = useState<KaggleKernel | null>(
+    null
+  )
   const [showNewRun, setShowNewRun] = useState(false)
+  const [showRunProject, setShowRunProject] = useState(false)
+
+  const handleRunSuccess = (result: KaggleRunProjectResult) => {
+    setSelectedKernel({
+      ref: result.kernel,
+      title: result.title,
+      author: '',
+      last_run_time: '',
+      total_votes: 0,
+    })
+    void refetch()
+  }
 
   return (
     <>
@@ -89,15 +105,33 @@ export function KaggleKernelsPage() {
           </Select>
         </div>
         <div className='flex items-center gap-2'>
-          <Button variant='outline' size='sm' onClick={() => void refetch()} disabled={isRefetching}>
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => void refetch()}
+            disabled={isRefetching}
+          >
             <RotateCw
               className={`mr-2 h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`}
             />
             Refresh
           </Button>
-          <Button size='sm' onClick={() => setShowNewRun(true)} disabled={!accountId}>
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => setShowNewRun(true)}
+            disabled={!accountId}
+          >
             <Play className='mr-2 h-4 w-4' />
             New Run
+          </Button>
+          <Button
+            size='sm'
+            onClick={() => setShowRunProject(true)}
+            disabled={!accountId}
+          >
+            <Rocket className='mr-2 h-4 w-4' />
+            Run Project
           </Button>
         </div>
       </Header>
@@ -106,8 +140,8 @@ export function KaggleKernelsPage() {
         <div className='mb-6'>
           <h1 className='text-2xl font-bold tracking-tight'>Kaggle Kernels</h1>
           <p className='text-muted-foreground'>
-            Run your models on Kaggle GPU — notebooks live in {activeAccount?.username || 'your'}'s
-            Code section
+            Run your models on Kaggle GPU — notebooks live in{' '}
+            {activeAccount?.username || 'your'}'s Code section
           </p>
         </div>
 
@@ -125,8 +159,10 @@ export function KaggleKernelsPage() {
           <Card>
             <CardContent className='flex flex-col items-center justify-center py-10'>
               <FileCode className='mb-4 h-12 w-12 text-muted-foreground' />
-              <h3 className='mb-2 text-lg font-semibold'>Failed to list kernels</h3>
-              <p className='max-w-xl break-all text-center text-sm text-muted-foreground'>
+              <h3 className='mb-2 text-lg font-semibold'>
+                Failed to list kernels
+              </h3>
+              <p className='max-w-xl text-center text-sm break-all text-muted-foreground'>
                 {String(error)}
               </p>
             </CardContent>
@@ -166,7 +202,9 @@ export function KaggleKernelsPage() {
                                 <ExternalLink className='h-3.5 w-3.5' />
                               </a>
                             </div>
-                            <div className='text-sm text-muted-foreground'>{k.ref}</div>
+                            <div className='text-sm text-muted-foreground'>
+                              {k.ref}
+                            </div>
                           </div>
                         </div>
                       </TableCell>
@@ -180,7 +218,9 @@ export function KaggleKernelsPage() {
                             {k.total_votes}
                           </span>
                         ) : (
-                          <span className='text-sm text-muted-foreground'>—</span>
+                          <span className='text-sm text-muted-foreground'>
+                            —
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className='text-right'>
@@ -214,8 +254,14 @@ export function KaggleKernelsPage() {
                 Create a run from a local notebook/script folder — Kaggle will
                 execute it on GPU and the log + output will show up here.
               </p>
-              <Button size='sm' onClick={() => setShowNewRun(true)} disabled={!accountId}>
-                {activeAccount ? null : <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
+              <Button
+                size='sm'
+                onClick={() => setShowNewRun(true)}
+                disabled={!accountId}
+              >
+                {activeAccount ? null : (
+                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                )}
                 <Play className='mr-2 h-4 w-4' />
                 New Run
               </Button>
@@ -226,7 +272,9 @@ export function KaggleKernelsPage() {
         {/* No accounts hint */}
         {!isLoading && managedAccounts.length === 0 && (
           <div className='mt-4 flex justify-center'>
-            <Badge variant='secondary'>Add a Kaggle account first (Accounts page)</Badge>
+            <Badge variant='secondary'>
+              Add a Kaggle account first (Accounts page)
+            </Badge>
           </div>
         )}
       </Main>
@@ -248,6 +296,13 @@ export function KaggleKernelsPage() {
         accountId={accountId}
         /* refresh after pushes */
         onPushed={() => void refetch()}
+      />
+
+      <RunProjectDialog
+        open={showRunProject}
+        onOpenChange={setShowRunProject}
+        accountId={accountId}
+        onRunSuccess={handleRunSuccess}
       />
     </>
   )

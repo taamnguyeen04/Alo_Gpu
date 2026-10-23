@@ -2,7 +2,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useKaggleStore } from '@/stores/kaggle-store'
 import * as kaggleApi from '@/lib/kaggle-api'
-import type { KaggleKernelPushConfig } from '@/lib/kaggle-types'
+import type {
+  KaggleKernelPushConfig,
+  KaggleRunProjectConfig,
+} from '@/lib/kaggle-types'
 
 // Log buffers can get huge in long runs — keep the tail only when rendering
 const MAX_LOG_LENGTH = 300000
@@ -35,9 +38,7 @@ export const kaggleKeys = {
 type ConditionalQueryOpts = {
   enabled?: boolean
   refetchInterval?:
-    | number
-    | false
-    | ((query: unknown) => number | false | undefined)
+    number | false | ((query: unknown) => number | false | undefined)
 }
 
 // CLI availability
@@ -134,7 +135,8 @@ export function useSetKaggleActiveAccount() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (accountId: string) => kaggleApi.setKaggleActiveAccount(accountId),
+    mutationFn: (accountId: string) =>
+      kaggleApi.setKaggleActiveAccount(accountId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: kaggleKeys.accounts })
       queryClient.invalidateQueries({ queryKey: kaggleKeys.activeGlobal })
@@ -160,7 +162,8 @@ export function useKaggleKernelStatus(
 ) {
   return useQuery({
     queryKey: kaggleKeys.kernelStatus(accountId, kernel),
-    queryFn: () => kaggleApi.getKaggleKernelStatus(accountId as string, kernel as string),
+    queryFn: () =>
+      kaggleApi.getKaggleKernelStatus(accountId as string, kernel as string),
     enabled: !!accountId && !!kernel && (opts?.enabled ?? true),
     refetchInterval: opts?.refetchInterval ?? false,
   })
@@ -173,7 +176,8 @@ export function useKaggleKernelLogs(
 ) {
   return useQuery({
     queryKey: kaggleKeys.kernelLogs(accountId, kernel),
-    queryFn: () => kaggleApi.getKaggleKernelLogs(accountId as string, kernel as string),
+    queryFn: () =>
+      kaggleApi.getKaggleKernelLogs(accountId as string, kernel as string),
     enabled: !!accountId && !!kernel && (opts?.enabled ?? true),
     refetchInterval: opts?.refetchInterval ?? false,
     select: dataCap300k,
@@ -187,7 +191,11 @@ export function useKaggleKernelFiles(
 ) {
   return useQuery({
     queryKey: kaggleKeys.kernelFiles(accountId, kernel),
-    queryFn: () => kaggleApi.listKaggleKernelOutputFiles(accountId as string, kernel as string),
+    queryFn: () =>
+      kaggleApi.listKaggleKernelOutputFiles(
+        accountId as string,
+        kernel as string
+      ),
     enabled: !!accountId && !!kernel && (opts?.enabled ?? true),
   })
 }
@@ -211,7 +219,12 @@ export function usePushKaggleKernel() {
       config: KaggleKernelPushConfig
       noRun: boolean
     }) =>
-      kaggleApi.pushKaggleKernel(data.accountId, data.folder, data.config, data.noRun),
+      kaggleApi.pushKaggleKernel(
+        data.accountId,
+        data.folder,
+        data.config,
+        data.noRun
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['kaggleKernels'] })
     },
@@ -235,6 +248,33 @@ export function useDownloadKaggleKernelOutput() {
   })
 }
 
+// --- AloRun (M4) ---
+
+export function useKaggleProjectScan(projectRoot?: string) {
+  return useQuery({
+    queryKey: ['kaggleProjectScan', projectRoot],
+    queryFn: () => kaggleApi.scanKaggleProject(projectRoot as string),
+    enabled: !!projectRoot,
+    staleTime: 15000,
+  })
+}
+
+export function useRunKaggleProject() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (data: {
+      accountId: string
+      projectRoot: string
+      config: KaggleRunProjectConfig
+    }) =>
+      kaggleApi.runKaggleProject(data.accountId, data.projectRoot, data.config),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kaggleKernels'] })
+    },
+  })
+}
+
 // --- Datasets (M3) ---
 
 export function useKaggleDatasets(accountId?: string) {
@@ -253,7 +293,8 @@ export function useKaggleDatasetFiles(
 ) {
   return useQuery({
     queryKey: kaggleKeys.datasetFiles(accountId, dataset),
-    queryFn: () => kaggleApi.listKaggleDatasetFiles(accountId as string, dataset as string),
+    queryFn: () =>
+      kaggleApi.listKaggleDatasetFiles(accountId as string, dataset as string),
     enabled: !!accountId && !!dataset && (opts?.enabled ?? true),
     staleTime: 60000,
   })
@@ -325,4 +366,3 @@ export function useCreateKaggleDatasetVersion() {
     },
   })
 }
-

@@ -155,6 +155,12 @@ src/routes/_authenticated/kaggle/
 - Output: `kernels_output(..., force=True)` vào `<code folder>/alo-output`; log dạng JSON events `{stream_name,time,data}`.
 - Cách dùng: `alo-run file.py|--acc|--cpu|--dataset|--out|--no-push|--no-watch`; rerun = version mới cùng slug; Ctrl+C = detach, reattach bằng `--no-push`.
 
+## File checklist lần này (M4 — AloRun trong app, modal-run style)
+- [x] BE: `kaggle_scan_project` (walk + ignore `DEFAULT_IGNORES` + `.gitignore`/`.aloignore`, count/size/entrypoints/requirements/pyproject)
+- [x] BE: `kaggle_run_project` — đóng gói tar.gz (thêm `tar`/`flate2`/`sha2`), sinh `runner.py` từ template `kaggle_runner_template.py` (tự extract + pip install requirements/pyproject/extra + secrets + argv + copy outputs về `alo_outputs`); runner ≥900KB → upload private per-run dataset `alogpu-run-<ts>` + attach + SHA-256 verify (giống KRun); push `kernels push` (+`--no-run`); workspace tạm `<app_data>/kaggle/runs/<ts>` (prune >24h)
+- [x] FE: types/api/hooks (`useKaggleProjectScan`, `useRunKaggleProject`) + `run-project-dialog.tsx` (browse root, scan preview files/size, entrypoint hoặc -m, accelerator, requirements select, extras/datasets/secrets/args/outputs, run-now) → submit xong tự mở kernel viewer
+- [x] Register `kaggle_scan_project`, `kaggle_run_project` trong `lib.rs`; README quickstart cập nhật
+
 ## File checklist lần này (M1)
 - [x] `src-tauri/src/commands/kaggle.rs` (core ~700 dòng)
 - [x] `commands/mod.rs` + `lib.rs` (register 9 commands)

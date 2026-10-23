@@ -10,6 +10,9 @@ import type {
   KaggleKernelPushConfig,
   KaggleDataset,
   KaggleDatasetFile,
+  KaggleProjectScan,
+  KaggleRunProjectConfig,
+  KaggleRunProjectResult,
 } from './kaggle-types'
 
 // CLI availability
@@ -59,12 +62,16 @@ export async function setKaggleActiveAccount(
 }
 
 // Quota commands
-export async function getKaggleQuota(accountId: string): Promise<KaggleQuota[]> {
+export async function getKaggleQuota(
+  accountId: string
+): Promise<KaggleQuota[]> {
   return invoke('kaggle_quota', { accountId })
 }
 
 // Kernel commands
-export async function listKaggleKernels(accountId: string): Promise<KaggleKernel[]> {
+export async function listKaggleKernels(
+  accountId: string
+): Promise<KaggleKernel[]> {
   return invoke('kaggle_kernels', { accountId })
 }
 
@@ -104,7 +111,12 @@ export async function downloadKaggleKernelOutput(
   file: string | undefined,
   path: string
 ): Promise<string> {
-  return invoke('kaggle_kernel_output_download', { accountId, kernel, file, path })
+  return invoke('kaggle_kernel_output_download', {
+    accountId,
+    kernel,
+    file,
+    path,
+  })
 }
 
 // Local folder listing (pick code file for push)
@@ -113,7 +125,9 @@ export async function listKaggleFolderFiles(path: string): Promise<string[]> {
 }
 
 // Dataset commands
-export async function listKaggleDatasets(accountId: string): Promise<KaggleDataset[]> {
+export async function listKaggleDatasets(
+  accountId: string
+): Promise<KaggleDataset[]> {
   return invoke('kaggle_datasets', { accountId })
 }
 
@@ -131,7 +145,13 @@ export async function downloadKaggleDataset(
   path: string,
   unzip: boolean
 ): Promise<string> {
-  return invoke('kaggle_dataset_download', { accountId, dataset, file, path, unzip })
+  return invoke('kaggle_dataset_download', {
+    accountId,
+    dataset,
+    file,
+    path,
+    unzip,
+  })
 }
 
 export async function createKaggleDataset(
@@ -142,7 +162,14 @@ export async function createKaggleDataset(
   license: string,
   isPublic: boolean
 ): Promise<string> {
-  return invoke('kaggle_dataset_create', { accountId, folder, title, slug, license, isPublic })
+  return invoke('kaggle_dataset_create', {
+    accountId,
+    folder,
+    title,
+    slug,
+    license,
+    isPublic,
+  })
 }
 
 export async function createKaggleDatasetVersion(
@@ -152,4 +179,19 @@ export async function createKaggleDatasetVersion(
   notes: string
 ): Promise<string> {
   return invoke('kaggle_dataset_version', { accountId, folder, dataset, notes })
+}
+
+// AloRun (modal-run style)
+export async function scanKaggleProject(
+  projectRoot: string
+): Promise<KaggleProjectScan> {
+  return invoke('kaggle_scan_project', { projectRoot })
+}
+
+export async function runKaggleProject(
+  accountId: string,
+  projectRoot: string,
+  config: KaggleRunProjectConfig
+): Promise<KaggleRunProjectResult> {
+  return invoke('kaggle_run_project', { accountId, projectRoot, config })
 }

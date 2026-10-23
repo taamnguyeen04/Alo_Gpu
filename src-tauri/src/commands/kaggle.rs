@@ -1755,3 +1755,867 @@ pub async fn kaggle_dataset_version(
         Err(combined)
     }
 }
+
+// ---------------------------------------------------------------------------
+// Part 4 — AloRun (modal-run style: package a local Python project & run it)
+//
+// Inspired by KRun (nhminh107/KRun-PyProjectOnKaggle, MIT). The project tree is
+// archived (tar.gz), embedded into a generated Python runner (or, when the
+// runner exceeds Kaggle's ~1MB source limit, uploaded as a private per-job
+// dataset the kernel attaches) and pushed with `kernels push`.
+// ---------------------------------------------------------------------------
+
+const MAX_PACKAGE_BYTES: u64 = 20 * 1024 * 1024; // 20 MB, same ceiling as KRun
+const MAX_RUNNER_BYTES: usize = 900_000; // headroom below Kaggle's ~1 MB source limit
+const HARD_RUNNER_BYTES: usize = 1_000_000;
+
+const DEFAULT_IGNORES: &[&str] = &[
+    ".git",
+    ".krun",
+    ".aloignore",
+    ".venv",
+    "venv",
+    "env",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".ipynb_checkpoints",
+    ".kaggle",
+    ".idea",
+    ".vscode",
+    "credentials.json",
+    "access_token",
+    "kaggle.json",
+    ".DS_Store",
+    ".env",
+    ".env.*",
+    "*.pem",
+    "*.key",
+    "*.p12",
+    "*.pfx",
+    "id_rsa",
+    "id_ed25519",
+    "*.pyc",
+];
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KaggleProjectScan {
+    pub root: String,
+    pub file_count: u64,
+    pub total_bytes: u64,
+    pub entrypoints: Vec<String>,
+    pub requirements: String, // relative posix path or empty
+    pub pyproject: String,    // relative posix path or empty
+    pub over_limit: bool,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct KaggleRunProjectConfig {
+    pub title: String,
+    pub slug: String,
+    #[serde(default)]
+    pub entrypoint: String, // relative posix path; required in script mode
+    #[serde(default)]
+    pub module: String, // "-m" mode: package/module name (overrides entrypoint)
+    #[serde(default)]
+    pub requirements: String, // relative path to requirements.txt / pyproject.toml; empty = none
+    #[serde(default)]
+    pub extra_packages: Vec<String>,
+    #[serde(default)]
+    pub dataset_sources: Vec<String>,
+    #[serde(default)]
+    pub secrets: Vec<String>,
+    #[serde(default)]
+    pub args: Vec<String>,
+    #[serde(default)]
+    pub output_paths: Vec<String>,
+    #[serde(default)]
+    pub accelerator: String, // machine_shape, e.g. "NvidiaTeslaT4"
+    #[serde(default = "der_true")]
+    pub enable_internet: bool,
+    #[serde(default)]
+    pub no_run: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct KaggleRunProjectResult {
+    pub kernel: String, // owner/slug
+    pub title: String,
+    pub transport: String, // "embedded" | "private_dataset:<owner/slug>"
+    pub file_count: u64,
+    pub source_bytes: u64,
+    pub runner_bytes: usize,
+    pub message: String,
+}
+
+/// Minimal glob matcher for ignore rules: supports `*` (any, without `/`),
+/// `**` (any, crossing `/`) and `?` (single, without `/`).
+fn glob_match_impl(pat: &[u8], val: &[u8]) -> bool {
+    if pat.is_empty() {
+        return val.is_empty();
+    }
+    match pat[0] {
+        b'*' => {
+            if pat.len() > 1 && pat[1] == b'*' {
+                let rest = &pat[2..];
+                for i in 0..=val.len() {
+                    if glob_match_impl(rest, &val[i..]) {
+                        return true;
+                    }
+                }
+                false
+            } else {
+                let rest = &pat[1..];
+                for i in 0..=val.len() {
+                    if i > 0 && val[i - 1] == b'/' {
+                        break;
+                    }
+                    if glob_match_impl(rest, &val[i..]) {
+                        return true;
+                    }
+                }
+                false
+            }
+        }
+        b'?' => !val.is_empty() && val[0] != b'/' && glob_match_impl(&pat[1..], &val[1..]),
+        c => !val.is_empty() && val[0] == c && glob_match_impl(&pat[1..], &val[1..]),
+    }
+}
+
+fn glob_match(pattern: &str, value: &str) -> bool {
+    glob_match_impl(pattern.as_bytes(), value.as_bytes())
+}
+
+/// Apply one raw ignore rule to a project-relative posix path
+/// (loosely mirrors the .gitignore subset KRun documents).
+fn rule_matches(raw: &str, rel_posix: &str) -> bool {
+    let anchored = raw.starts_with('/');
+    let pat = raw.trim_start_matches('/').trim_end_matches('/');
+    if pat.is_empty() {
+        return false;
+    }
+    if anchored {
+        if glob_match(pat, rel_posix) {
+            return true;
+        }
+        // anchored directory: also match everything beneath it
+        return !(pat.contains('*') || pat.contains('?'))
+            && rel_posix.starts_with(&format!("{}/", pat));
+    }
+    if !pat.contains('/') {
+        // unanchored, single segment: matches any path component
+        return rel_posix.split('/').any(|part| glob_match(pat, part));
+    }
+    // mid-path prefix: match the path itself or anything beneath the dir
+    if glob_match(pat, rel_posix) {
+        return true;
+    }
+    !(pat.contains('*') || pat.contains('?')) && rel_posix.starts_with(&format!("{}/", pat))
+}
+
+/// Mandatory excludes first (never overridable), then user rules
+/// from the root `.gitignore` / `.aloignore` with last-match-wins negation.
+fn path_ignored(rel_posix: &str, user_rules: &[String]) -> bool {
+    for d in DEFAULT_IGNORES {
+        if rule_matches(d, rel_posix) {
+            return true;
+        }
+    }
+    let mut ignored = false;
+    for raw in user_rules {
+        let (negate, pat) = match raw.strip_prefix('!') {
+            Some(rest) => (true, rest),
+            None => (false, raw.as_str()),
+        };
+        if rule_matches(pat, rel_posix) {
+            ignored = !negate;
+        }
+    }
+    ignored
+}
+
+fn read_ignore_rules(root: &Path) -> Vec<String> {
+    let mut rules = Vec::new();
+    for name in [".gitignore", ".aloignore"] {
+        if let Ok(content) = fs::read_to_string(root.join(name)) {
+            for line in content.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                rules.push(line.to_string());
+            }
+        }
+    }
+    rules
+}
+
+/// Walk the project root, pruning ignored/symlinked dirs. Returns
+/// (sorted relative posix files, file_count, total_bytes, user_rules).
+fn collect_project_files(
+    root: &Path,
+) -> Result<(Vec<(String, PathBuf)>, u64, u64, Vec<String>), String> {
+    let rules = read_ignore_rules(root);
+    let mut files: Vec<(String, PathBuf)> = Vec::new();
+
+    fn walk(
+        rel_prefix: &str,
+        dir: &Path,
+        rules: &[String],
+        files: &mut Vec<(String, PathBuf)>,
+    ) -> Result<(), String> {
+        let entries = fs::read_dir(dir)
+            .map_err(|e| format!("Failed to read {}: {}", dir.display(), e))?;
+        for entry in entries {
+            let entry = entry.map_err(|e| format!("Bad entry in {}: {}", dir.display(), e))?;
+            let path = entry.path();
+            if path.is_symlink() {
+                continue;
+            }
+            let name = entry.file_name().to_string_lossy().to_string();
+            let rel = if rel_prefix.is_empty() {
+                name.clone()
+            } else {
+                format!("{}/{}", rel_prefix, name)
+            };
+            if path.is_dir() {
+                if !path_ignored(&rel, rules) {
+                    walk(&rel, &path, rules, files)?;
+                }
+            } else if path.is_file() && !path_ignored(&rel, rules) {
+                files.push((rel, path));
+            }
+        }
+        Ok(())
+    }
+
+    walk("", root, &rules, &mut files)?;
+    files.sort_by(|a, b| a.0.cmp(&b.0));
+    let file_count = files.len() as u64;
+    let total_bytes: u64 = files
+        .iter()
+        .map(|(_, abs)| fs::metadata(abs).map(|m| m.len()).unwrap_or(0))
+        .sum();
+    Ok((files, file_count, total_bytes, rules))
+}
+
+fn top_largest(files: &[(String, PathBuf)], n: usize) -> String {
+    let mut sized: Vec<(u64, &str)> = files
+        .iter()
+        .map(|(rel, abs)| (fs::metadata(abs).map(|m| m.len()).unwrap_or(0), rel.as_str()))
+        .collect();
+    sized.sort_by(|a, b| b.0.cmp(&a.0));
+    sized
+        .into_iter()
+        .take(n)
+        .map(|(size, rel)| format!("{} ({} bytes)", rel, size))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+#[tauri::command]
+pub async fn kaggle_scan_project(project_root: String) -> Result<KaggleProjectScan, String> {
+    info!("Scanning local project for alo-run: {}", project_root);
+    let root = PathBuf::from(project_root.trim());
+    if project_root.trim().is_empty() || !root.is_dir() {
+        return Err(format!("Not a folder: {}", project_root.trim()));
+    }
+    let (files, file_count, total_bytes, _) = collect_project_files(&root)?;
+    let rels: Vec<String> = files.iter().map(|(rel, _)| rel.clone()).collect();
+
+    let mut warnings = Vec::new();
+    if total_bytes > MAX_PACKAGE_BYTES {
+        warnings.push(format!(
+            "Project is over the 20 MB limit — trim large files or attach data via datasets. Largest: {}",
+            top_largest(&files, 3)
+        ));
+    }
+    if file_count == 0 {
+        warnings.push(
+            "No files left after ignore rules — check .gitignore/.aloignore in the project".to_string(),
+        );
+    }
+
+    Ok(KaggleProjectScan {
+        root: root.display().to_string(),
+        file_count,
+        total_bytes,
+        entrypoints: rels
+            .iter()
+            .filter(|r| r.to_ascii_lowercase().ends_with(".py"))
+            .take(300)
+            .cloned()
+            .collect(),
+        requirements: rels
+            .iter()
+            .find(|r| r.eq_ignore_ascii_case("requirements.txt"))
+            .cloned()
+            .unwrap_or_default(),
+        pyproject: rels
+            .iter()
+            .find(|r| r.eq_ignore_ascii_case("pyproject.toml"))
+            .cloned()
+            .unwrap_or_default(),
+        over_limit: total_bytes > MAX_PACKAGE_BYTES,
+        warnings,
+    })
+}
+
+fn valid_module_name(m: &str) -> bool {
+    !m.is_empty()
+        && m.split('.')
+            .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'))
+}
+
+/// Sanitize + validate the run config (paths normalized to posix separators).
+fn normalize_run_config(config: KaggleRunProjectConfig) -> Result<KaggleRunProjectConfig, String> {
+    let mut c = config;
+    c.title = c.title.trim().to_string();
+    c.slug = c.slug.trim().to_lowercase().replace('_', "-");
+    c.entrypoint = c.entrypoint.trim().replace('\\', "/");
+    c.requirements = c.requirements.trim().replace('\\', "/");
+
+    if c.title.chars().count() < 5 {
+        return Err("Title must be at least 5 characters".to_string());
+    }
+    if !c.slug.is_empty()
+        && !c
+            .slug
+            .chars()
+            .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-')
+    {
+        return Err("Slug may only contain lowercase letters, numbers and dashes".to_string());
+    }
+    if c.slug.starts_with('-') || c.slug.ends_with('-') {
+        return Err("Slug may not start or end with a dash".to_string());
+    }
+
+    let script_mode = !c.entrypoint.is_empty();
+    let module_mode = !c.module.trim().is_empty();
+    if script_mode == module_mode {
+        return Err("Provide either an entrypoint file (script) or a module name (-m)".to_string());
+    }
+    if script_mode && !c.entrypoint.ends_with(".py") {
+        return Err("Entrypoint must be a .py file".to_string());
+    }
+    if module_mode {
+        let m = c.module.trim().to_string();
+        if !valid_module_name(&m) {
+            return Err("Module name must look like 'my_pkg' or 'my_pkg.main'".to_string());
+        }
+        c.module = m;
+    }
+
+    // datasets: each must be owner/slug
+    for ds in &c.dataset_sources {
+        let parts: Vec<&str> = ds.split('/').collect();
+        if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
+            return Err(format!("Dataset source must be owner/slug, got '{}'", ds));
+        }
+    }
+    // packages: none may look like a pip option
+    for pkg in &c.extra_packages {
+        if pkg.trim().is_empty() {
+            return Err("Extra packages contain an empty item".to_string());
+        }
+        if pkg.starts_with('-') {
+            return Err(format!("Extra package '{}' looks like a pip option", pkg));
+        }
+    }
+    // secrets: identifiers only
+    for s in &c.secrets {
+        if !s.is_empty()
+            && (s.starts_with(|c: char| c.is_ascii_digit())
+                || !s
+                    .chars()
+                    .all(|ch| ch.is_ascii_alphanumeric() || ch == '_'))
+        {
+            return Err(format!("Secret name '{}' is not a valid identifier", s));
+        }
+    }
+    // outputs: project-relative, not root
+    let mut outputs = Vec::new();
+    for raw in &c.output_paths {
+        let o = raw.trim().trim_matches('/').to_string();
+        if o.is_empty() || o == "." {
+            return Err(format!(
+                "Output path '{}' must name a folder inside the project",
+                raw
+            ));
+        }
+        if Path::new(&o).is_absolute() || o.split('/').any(|p| p == "..") {
+            return Err(format!("Output path must stay inside the project: {}", o));
+        }
+        if !outputs.contains(&o) {
+            outputs.push(o);
+        }
+    }
+    if outputs.is_empty() {
+        outputs.push("outputs".to_string()); // KRun-style default collection folder
+    }
+    c.output_paths = outputs;
+    Ok(c)
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::Digest;
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(bytes);
+    hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect()
+}
+
+struct RunnerDeps {
+    entrypoint: String,
+    module: String,
+    module_path: String,
+    args: Vec<String>,
+    requirements: Option<String>,
+    dep_project: Option<String>,
+    extra_packages: Vec<String>,
+    secrets: Vec<String>,
+    outputs: Vec<String>,
+}
+
+fn json_or_null(v: Option<&str>) -> String {
+    match v {
+        Some(s) => serde_json::to_string(s).unwrap_or_else(|_| "null".to_string()),
+        None => "null".to_string(),
+    }
+}
+
+fn render_run_runner(payload: &str, archive: Option<(&str, &str)>, deps: &RunnerDeps) -> String {
+    let template = include_str!("kaggle_runner_template.py");
+    let json_str = |s: &str| serde_json::to_string(s).unwrap_or_else(|_| "\"\"".to_string());
+    let json_arr = |v: &[String]| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string());
+
+    let entrypoint_json = json_str(&deps.entrypoint);
+    let module_json = if deps.module.is_empty() {
+        "null".to_string()
+    } else {
+        json_str(&deps.module)
+    };
+    let module_path_json = json_str(&deps.module_path);
+    let args_json = json_arr(&deps.args);
+    let requirements_json = json_or_null(deps.requirements.as_deref());
+    let dep_project_json = json_or_null(deps.dep_project.as_deref());
+    let extras_json = json_arr(&deps.extra_packages);
+    let secrets_json = json_arr(&deps.secrets);
+    let outputs_json = json_arr(&deps.outputs);
+
+    let base = template
+        .replace("@@PAYLOAD@@", payload)
+        .replace("@@ENTRYPOINT@@", &entrypoint_json)
+        .replace("@@MODULE@@", &module_json)
+        .replace("@@MODULE_PATH@@", &module_path_json)
+        .replace("@@ARGS@@", &args_json)
+        .replace("@@REQUIREMENTS@@", &requirements_json)
+        .replace("@@DEP_PROJECT@@", &dep_project_json)
+        .replace("@@EXTRA_PACKAGES@@", &extras_json)
+        .replace("@@SECRET_NAMES@@", &secrets_json)
+        .replace("@@OUTPUTS@@", &outputs_json);
+
+    match archive {
+        Some((name, digest)) => {
+            let name_json = json_str(name);
+            let digest_json = json_str(digest);
+            base.replace("@@ARCHIVE_NAME@@", &name_json)
+                .replace("@@ARCHIVE_DIGEST@@", &digest_json)
+        }
+        None => base
+            .replace("@@ARCHIVE_NAME@@", "null")
+            .replace("@@ARCHIVE_DIGEST@@", "null"),
+    }
+}
+
+fn build_archive(_root: &Path, files: &[(String, PathBuf)]) -> Result<Vec<u8>, String> {
+    use flate2::write::GzEncoder;
+    let gz = GzEncoder::new(Vec::new(), flate2::Compression::default());
+    let mut builder = tar::Builder::new(gz);
+    for (rel, abs) in files {
+        let mut file = fs::File::open(abs)
+            .map_err(|e| format!("Failed to open {}: {}", rel, e))?;
+        builder
+            .append_file(Path::new(rel), &mut file)
+            .map_err(|e| format!("Failed to archive {}: {}", rel, e))?;
+    }
+    builder
+        .into_inner()
+        .map_err(|e| format!("Failed to finalize archive: {}", e))?
+        .finish()
+        .map_err(|e| format!("Failed to compress archive: {}", e))
+}
+
+fn prepare_runs_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let base = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to resolve app data dir: {}", e))?;
+    let runs_root = base.join("kaggle").join("runs");
+    fs::create_dir_all(&runs_root)
+        .map_err(|e| format!("Failed to create {}: {}", runs_root.display(), e))?;
+
+    // Opportunistic cleanup: drop run dirs older than 24h
+    if let Ok(entries) = fs::read_dir(&runs_root) {
+        if let Some(cutoff) = SystemTime::now().checked_sub(std::time::Duration::from_secs(86_400))
+        {
+            for e in entries.filter_map(|e| e.ok()) {
+                let p = e.path();
+                if p.is_dir() {
+                    if let Ok(md) = e.metadata() {
+                        if let Ok(modified) = md.modified() {
+                            if modified < cutoff {
+                                let _ = fs::remove_dir_all(&p);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let dir = runs_root.join(format!("{}-{}", now_unix(), uuid::Uuid::new_v4().simple()));
+    fs::create_dir_all(&dir)
+        .map_err(|e| format!("Failed to create run dir: {}", e))?;
+    Ok(dir)
+}
+
+/// `kaggle datasets status <id>` until "ready" (CLI >= 2.2, same contract as KRun).
+fn wait_package_dataset(
+    app: &AppHandle,
+    account_id: &str,
+    dataset_id: &str,
+) -> Result<(), String> {
+    let deadline_and_attempt = 120usize; // 120 * 5s = 10 min
+    for attempt in 0..deadline_and_attempt {
+        let out = run_command(
+            kaggle_command_for_account(app, account_id)?,
+            &["datasets", "status", dataset_id],
+        )?;
+        let raw = String::from_utf8_lossy(&out.stdout)
+            .trim()
+            .to_lowercase()
+            .to_string();
+        if raw == "ready" {
+            return Ok(());
+        }
+        let in_progress = ["queued", "processing", "not_yet_persisted", "blobs_received",
+            "blobs_decompressed", "blobs_copied_to_sds", "individual_blobs_compressed",
+            "reprocessing"];
+        if !out.status.success() || !in_progress.iter().any(|w| raw.contains(w)) {
+            if attempt + 1 < 3 && (raw.contains("timeout") || raw.contains("connection")) {
+                std::thread::sleep(std::time::Duration::from_secs(3));
+                continue;
+            }
+            let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+            return Err(format!(
+                "Package dataset {} is not ready (status: {})",
+                dataset_id,
+                if stderr.is_empty() { raw } else { stderr }
+            ));
+        }
+        std::thread::sleep(std::time::Duration::from_secs(5));
+    }
+    Err(format!(
+        "Timed out waiting for package dataset {}. Check it on Kaggle before retrying.",
+        dataset_id
+    ))
+}
+
+/// Upload the archive as a private per-job dataset (only for large projects).
+fn upload_package_dataset(
+    app: &AppHandle,
+    account_id: &str,
+    username: &str,
+    dataset_dir: &Path,
+) -> Result<String, String> {
+    let dataset_slug = format!("alogpu-run-{}", now_unix());
+    let dataset_id = format!("{}/{}", username, dataset_slug);
+    let metadata = serde_json::json!({
+        "id": dataset_id,
+        "title": dataset_slug.replace('-', " "),
+        "licenses": [{ "name": "other" }],
+        "description": "Private AloGPU run package. Do not edit or delete while the run exists.",
+    });
+    let raw = serde_json::to_string_pretty(&metadata)
+        .map_err(|e| format!("Failed to serialize dataset-metadata.json: {}", e))?;
+    secure_write(&dataset_dir.join("dataset-metadata.json"), &raw)?;
+
+    let out = run_command(
+        kaggle_command_for_account(app, account_id)?,
+        &["datasets", "create", "-p", dataset_dir.display().to_string().as_str()],
+    )?;
+    if !out.status.success() {
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        return Err(format!(
+            "AloGPU package dataset upload failed: {}{}",
+            stdout.trim(),
+            stderr.trim()
+        ));
+    }
+    wait_package_dataset(app, account_id, &dataset_id)?;
+    Ok(dataset_id)
+}
+
+fn run_project_blocking(
+    app: AppHandle,
+    account_id: String,
+    project_root: String,
+    config: KaggleRunProjectConfig,
+) -> Result<KaggleRunProjectResult, String> {
+    let started = std::time::Instant::now();
+    info!(
+        "AloRun: account={}, root={}, title={}",
+        account_id, project_root, config.title
+    );
+
+    let config = normalize_run_config(config)?;
+    let root = PathBuf::from(project_root.trim());
+    if project_root.trim().is_empty() || !root.is_dir() {
+        return Err(format!("Project root folder not found: {}", root.display()));
+    }
+
+    let (files, file_count, total_bytes, _) = collect_project_files(&root)?;
+    if files.is_empty() {
+        return Err(
+            "No files were collected from the project — check ignore rules".to_string(),
+        );
+    }
+    if total_bytes > MAX_PACKAGE_BYTES {
+        return Err(format!(
+            "Project exceeds the 20 MB package limit. Largest files: {}. \
+             Trim large inputs or attach them via Kaggle datasets instead.",
+            top_largest(&files, 5)
+        ));
+    }
+
+    // Validate entrypoint/module against the collected file list
+    let rels: std::collections::HashSet<String> =
+        files.iter().map(|(r, _)| r.clone()).collect();
+    let mut module_path = ".".to_string();
+    let (run_entrypoint, run_module) = if !config.entrypoint.is_empty() {
+        if !rels.contains(&config.entrypoint) {
+            return Err(format!(
+                "Entrypoint '{}' was excluded by ignore rules or does not exist",
+                config.entrypoint
+            ));
+        }
+        (config.entrypoint.clone(), String::new())
+    } else {
+        let m = config.module.trim();
+        let mod_dir = m.replace('.', "/");
+        let candidates: [(&str, String); 4] = [
+            ("", format!("{}/__main__.py", mod_dir)),
+            ("", format!("{}.py", mod_dir)),
+            ("src", format!("{}/__main__.py", mod_dir)),
+            ("src", format!("{}.py", mod_dir)),
+        ];
+        let mut found = None;
+        for (base, rel) in candidates.iter() {
+            let base = if base.is_empty() {
+                String::new()
+            } else {
+                format!("{}/", base)
+            };
+            let full = format!("{}{}", base, rel);
+            if rels.contains(&full) {
+                found = Some((base, full));
+                break;
+            }
+        }
+        match found {
+            Some((base, _full)) => {
+                module_path = if base.is_empty() { "." } else { "src" }.to_string();
+                (m.to_string(), m.to_string())
+            }
+            None => {
+                return Err(format!(
+                    "Module '{}' not found: expected {}.py/{}__main__.py in project root or src/",
+                    m, mod_dir, mod_dir
+                ));
+            }
+        }
+    };
+    // (run_entrypoint doubles as argv[0]; run_module is empty in script mode)
+
+    // Validate dependency file
+    let mut requirements: Option<String> = None;
+    let mut dep_project: Option<String> = None;
+    if !config.requirements.is_empty() && !rels.contains(&config.requirements) {
+        return Err(format!(
+            "Dependency file '{}' was excluded by ignore rules or does not exist",
+            config.requirements
+        ));
+    }
+    if config.requirements.ends_with(".toml") {
+        dep_project = if config.requirements.contains('/') {
+            Some(
+                Path::new(&config.requirements)
+                    .parent()
+                    .map(|p| p.display().to_string().replace('\\', "/"))
+                    .unwrap_or_else(|| ".".to_string()),
+            )
+        } else {
+            Some(".".to_string())
+        };
+    } else if !config.requirements.is_empty() {
+        requirements = Some(config.requirements.clone());
+    }
+
+    let deps_needing_net = requirements.is_some()
+        || dep_project.is_some()
+        || !config.extra_packages.is_empty();
+    if deps_needing_net && !config.enable_internet {
+        return Err(
+            "Internet is OFF but dependencies were declared — pip cannot install them \
+             without internet. Enable internet or drop the dependency config."
+                .to_string(),
+        );
+    }
+
+    let deps = RunnerDeps {
+        entrypoint: run_entrypoint,
+        module: run_module,
+        module_path,
+        args: config.args.iter().map(|a| a.trim().to_string()).filter(|a| !a.is_empty()).collect(),
+        requirements,
+        dep_project,
+        extra_packages: config
+            .extra_packages
+            .iter()
+            .map(|p| p.trim().to_string())
+            .filter(|p| !p.is_empty())
+            .collect(),
+        secrets: config.secrets.iter().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
+        outputs: config.output_paths.clone(),
+    };
+
+    let username = resolve_username_for(&app, &account_id)?;
+    let runs_dir = prepare_runs_dir(&app)?;
+    let workspace = runs_dir.join("workspace");
+    let result: Result<KaggleRunProjectResult, String> = (|| {
+        let archive = build_archive(&root, &files)?;
+        use base64::Engine as _;
+        let payload_initial = base64::engine::general_purpose::STANDARD.encode(&archive);
+
+        let mut runner = render_run_runner(&payload_initial, None, &deps);
+        let mut transport = "embedded".to_string();
+        let mut attached: Vec<String> = config.dataset_sources.clone();
+
+        if runner.len() >= MAX_RUNNER_BYTES {
+            // Large project: ship the archive as a private per-job dataset.
+            let digest = sha256_hex(&archive);
+            let dataset_dir = runs_dir.join("dataset");
+            fs::create_dir_all(&dataset_dir)
+                .map_err(|e| format!("Failed to create dataset dir: {}", e))?;
+            let archive_name = format!("alogpu-{}.bin", &digest[..16]);
+            fs::write(dataset_dir.join(&archive_name), &archive)
+                .map_err(|e| format!("Failed to write package archive: {}", e))?;
+            let dataset_id = upload_package_dataset(&app, &account_id, &username, &dataset_dir)?;
+            attached.insert(0, dataset_id.clone());
+            transport = format!("private_dataset:{}", dataset_id);
+            runner = render_run_runner("", Some((archive_name.as_str(), digest.as_str())), &deps);
+            if runner.len() >= HARD_RUNNER_BYTES {
+                return Err(
+                    "Runner exceeds Kaggle's ~1 MB source limit — reduce arguments/configuration"
+                        .to_string(),
+                );
+            }
+        }
+
+        fs::create_dir_all(&workspace)
+            .map_err(|e| format!("Failed to create workspace dir: {}", e))?;
+        fs::write(workspace.join("runner.py"), &runner)
+            .map_err(|e| format!("Failed to write runner.py: {}", e))?;
+
+        // kernel-metadata.json — mirrors kaggle_kernel_push (machine_shape)
+        let mut metadata = serde_json::json!({
+            "id": format!("{}/{}", username, config.slug),
+            "title": config.title,
+            "code_file": "runner.py",
+            "language": "python",
+            "kernel_type": "script",
+            "is_private": true,
+            "enable_internet": config.enable_internet,
+            "dataset_sources": attached,
+            "kernel_sources": [],
+        });
+        if !config.accelerator.is_empty() {
+            metadata["machine_shape"] = serde_json::Value::String(config.accelerator.clone());
+        }
+        let metadata_raw = serde_json::to_string_pretty(&metadata)
+            .map_err(|e| format!("Failed to serialize kernel-metadata.json: {}", e))?;
+        secure_write(&workspace.join("kernel-metadata.json"), &metadata_raw)?;
+
+        let mut args: Vec<String> = vec![
+            "kernels".to_string(),
+            "push".to_string(),
+            "-p".to_string(),
+            workspace.display().to_string(),
+        ];
+        if config.no_run {
+            args.push("--no-run".to_string());
+        }
+        let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+        let out = run_command(kaggle_command_for_account(&app, &account_id)?, &args_ref)?;
+        let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+        let success = out.status.success() && !stdout.contains("Kernel push error");
+        if !success {
+            let combined = if stderr.trim().is_empty() {
+                stdout.trim().to_string()
+            } else {
+                format!("{}{}", stdout.trim(), stderr.trim())
+            };
+            return Err(format!("kernels push failed: {}", combined));
+        }
+
+        info!(
+            "AloRun submitted {} in {}s ({} files, {} bytes, {})",
+            format!("{}/{}", username, config.slug),
+            started.elapsed().as_secs(),
+            file_count,
+            total_bytes,
+            transport
+        );
+        Ok(KaggleRunProjectResult {
+            kernel: format!("{}/{}", username, config.slug),
+            title: config.title.clone(),
+            transport,
+            file_count,
+            source_bytes: total_bytes,
+            runner_bytes: runner.len(),
+            message: stdout.trim().to_string(),
+        })
+    })();
+
+    match result {
+        Ok(res) => {
+            // Cleanup temp artifacts on success
+            let _ = fs::remove_dir_all(&runs_dir);
+            Ok(res)
+        }
+        Err(e) => {
+            error!("AloRun failed, keeping {} for inspection: {}", runs_dir.display(), e);
+            Err(e)
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn kaggle_run_project(
+    app: AppHandle,
+    account_id: String,
+    project_root: String,
+    config: KaggleRunProjectConfig,
+) -> Result<KaggleRunProjectResult, String> {
+    info!("kaggle_run_project: account={}, root={}", account_id, project_root);
+    let handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        run_project_blocking(handle, account_id, project_root, config)
+    })
+    .await
+    .map_err(|e| format!("AloRun task failed: {}", e))?
+}

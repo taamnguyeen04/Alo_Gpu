@@ -3,6 +3,7 @@
 Ứng dụng desktop quản lý các dịch vụ ML cloud của bạn: **Modal** (workspaces, apps, volumes, secrets, TensorBoard, billing) và **Kaggle** (GPU miễn phí để chạy model — accounts, quota, kernels, datasets). Mỗi nền tảng có khối riêng trên sidebar với logo riêng.
 
 Phía backend Rust không gọi API trực tiếp mà bọc CLI:
+
 - **Modal CLI** (`modal`) — tự động đổi workspace qua biến môi trường `MODAL_PROFILE` → mọi hành động đều dùng đúng profile/modal account đã đăng nhập trên máy bạn.
 - **Kaggle CLI** (`kaggle` ≥ 2.2) — mỗi account chạy trong env cách ly riêng (`KAGGLE_CONFIG_DIR` cho legacy key, `KAGGLE_API_TOKEN` cho personal token), không ảnh hưởng nhau.
 
@@ -19,22 +20,23 @@ Phía backend Rust không gọi API trực tiếp mà bọc CLI:
 
 ### Kaggle — GPU miễn phí để chạy model
 
-- **Accounts** — dán username + legacy API key *hoặc* personal API token (verify thật ngay khi thêm); key chỉ lưu trong app data, UI chỉ nhận `••••` + 4 ký tự cuối; **Set Active** để mọi lệnh Kaggle ngoài app (terminal/script) dùng account đó; tự nhận diện account `~/.kaggle` toàn cục (read-only)
+- **Accounts** — dán username + legacy API key _hoặc_ personal API token (verify thật ngay khi thêm); key chỉ lưu trong app data, UI chỉ nhận `••••` + 4 ký tự cuối; **Set Active** để mọi lệnh Kaggle ngoài app (terminal/script) dùng account đó; tự nhận diện account `~/.kaggle` toàn cục (read-only)
 - **Quota** — GPU/TPU hours còn lại trong tuần (`quota --format json`, fallback CSV cho CLI 1.x), bấm **Update All Quotas** tải quota cho tất cả account
 - **Kernels** — chạy model trên GPU Kaggle: **New Run** chọn folder chứa `.py`/`.ipynb` + accelerator (T4 x2 / L4 / A100 / H100 / TPU), xem status + log (poll 5s khi running), tải output về máy; rerun = version mới cùng slug
+- **Run Project (alo-run)** — chạy **project Python local kiểu `modal run`**: chọn project root + entrypoint (hoặc `-m module`), app tự đóng gói toàn bộ source (tôn trọng `.gitignore`/`.aloignore`, bo <20MB) thành `runner.py` sinh ra tự động — **tự `pip install` requirements.txt / pyproject.toml / `--package` ngay trên Kaggle**, hỗ trợ dataset attach, Kaggle secrets, script args, output folder; project lớn thì tự tải package lên **private dataset** riêng rồi attach (kỹ thuật giống [KRun](https://github.com/nhminh107/KRun-PyProjectOnKaggle)). Sau khi submit tự mở kernel viewer theo log + tải output
 - **Datasets** — upload folder thành dataset (mới hoặc version mới với notes bắt buộc), duyệt/tải files (unzip tuỳ chọn) làm nguồn data cho kernel
 
 ## 📋 Yêu cầu hệ thống
 
-| Thành phần                                        | Yêu cầu                      | Ghi chú                                                                        |
-| ------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------ |
-| Hệ điều hành                                      | Windows 10/11                | Bundle hiện là MSI/NSIS, TensorBoard dùng `taskkill` (Windows-only)            |
-| Node.js                                           | ≥ 20.19 (khuyến nghị LTS 22) | kèm npm 10+                                                                    |
-| Rust                                              | stable ≥ 1.77.2              | cài qua [rustup](https://rustup.rs/)                                           |
-| VS C++ Build Tools                                | bắt buộc trên Windows        | để compile Tauri (xem [prerequisites](https://tauri.app/start/prerequisites/)) |
-| [Modal CLI](https://modal.com/docs/reference/cli) | mới nhất                     | `pip install modal` rồi `modal setup` để đăng nhập                             |
-| [Kaggle CLI](https://github.com/Kaggle/kaggle-api) ≥ 2.2 | tuỳ chọn              | chỉ cần khi dùng tab Kaggle: `pip install kaggle`                              |
-| Python + TensorBoard                              | tùy chọn                     | chỉ cần khi dùng tab TensorBoard: `pip install tensorboard`                    |
+| Thành phần                                               | Yêu cầu                      | Ghi chú                                                                        |
+| -------------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------ |
+| Hệ điều hành                                             | Windows 10/11                | Bundle hiện là MSI/NSIS, TensorBoard dùng `taskkill` (Windows-only)            |
+| Node.js                                                  | ≥ 20.19 (khuyến nghị LTS 22) | kèm npm 10+                                                                    |
+| Rust                                                     | stable ≥ 1.77.2              | cài qua [rustup](https://rustup.rs/)                                           |
+| VS C++ Build Tools                                       | bắt buộc trên Windows        | để compile Tauri (xem [prerequisites](https://tauri.app/start/prerequisites/)) |
+| [Modal CLI](https://modal.com/docs/reference/cli)        | mới nhất                     | `pip install modal` rồi `modal setup` để đăng nhập                             |
+| [Kaggle CLI](https://github.com/Kaggle/kaggle-api) ≥ 2.2 | tuỳ chọn                     | chỉ cần khi dùng tab Kaggle: `pip install kaggle`                              |
+| Python + TensorBoard                                     | tùy chọn                     | chỉ cần khi dùng tab TensorBoard: `pip install tensorboard`                    |
 
 Kiểm tra đã đủ điều kiện:
 
@@ -78,20 +80,22 @@ Xem UI trên browser tại `http://localhost:5173` — các nút cần Tauri inv
 
 1. **Accounts** → **Add Account** → dán username + legacy API key, hoặc chỉ cần personal API token (Kaggle → Settings → API → Create New Token). App verify thật bằng lệnh `quota` ngay — sai key sẽ tự rollback.
 2. **Update All Quotas** → xem GPU/TPU hours còn lại của tuần (30h GPU / 20h TPU là mức mặc định Kaggle).
-3. **Kernels → New Run** → chọn folder chứa file code:
-   - `.py` → Type tự nhận **Script**, `.ipynb` → **Notebook** (vẫn chỉnh tay được)
-   - Accelerator mặc định **GPU T4 x2**; `Dataset sources` dán `username/slug` nếu cần data (mount sẵn ở `/kaggle/input/<slug>/`)
-   - **Push & Run** → mở viewer xem status + log (poll 5s) → **Output** → tải về máy
-4. Quy tắc Kaggle: mọi file save vào thư mục làm việc (`/kaggle/working`) thành **kernel output** — ở app chỉ cần bấm tải về là có `model.pt`, metrics...
+3. **Kernels → Run Project** (khuyến khích — kiểu `modal run`) → chọn project root Python của bạn:
+   - Entrypoint chọn file `.py` (mặc định ưu tiên `main.py`/`train.py`/`app.py`/`run.py`), hoặc bật **Run as module (-m)** cho `python -m my_pkg`
+   - App tự đóng gói project (tôn trọng `.gitignore`/`.aloignore`, giới hạn 20MB) → tự cài `requirements.txt` / `pyproject.toml` / extra pip packages **trên Kaggle**
+   - Chọn accelerator + internet, thêm dataset attach (`user/my-data`), secrets, script args (`--epochs 10`...), output folder (mặc định `outputs`)
+   - **Chạy trên Kaggle** → viewer tự mở theo status + log → **Output** tải `alo_outputs/...` về máy
+4. **Kernels → New Run** → đẩy 1 file code đơn lẻ `.py`/`.ipynb` (Type tự nhận Script/Notebook, vẫn chỉnh tay được), kèm `kernel-metadata.json` sinh sẵn trong folder — hợp khi chỉ muốn push đúng 1 file mà không cần đóng gói cả project
+5. Quy tắc Kaggle: mọi file save vào thư mục làm việc (`/kaggle/working`) thành **kernel output** — ở app chỉ cần bấm tải về là có `model.pt`, metrics...
 
-### `alo-run` — 1 lệnh kiểu `modal run` (CLI bổ trợ)
+### `alo-run` — 1 lệnh kiểu `modal run` (CLI bổ trợ, ngoài app)
 
-Repo có sẵn `tools/alo-run.py` — push + **stream log live** + tự tải output về, dùng đúng account **Active** của app (không nhập lại key). Cách cài shim vào PATH:
+CLI `alo-run.py` nằm ngoài repo (ví dụ `%USERPROFILE%\Documents\alo-tools\alo-run.py`) — push + **stream log live** + tự tải output về, dùng đúng account **Active** của app (không nhập lại key). Cách cài shim vào PATH:
 
 ```powershell
 # tạo alo-run.cmd trong 1 thư mục đã có trên PATH, ví dụ Python\Scripts
 Set-Content "$env:LOCALAPPDATA\Programs\Python\Python311\Scripts\alo-run.cmd" `
-  '@python -u "%~dp0..\..\Documents\GitHub\Alo_Gpu\tools\alo-run.py" %*'
+  '@python -u "%~dp0..\..\Documents\alo-tools\alo-run.py" %*'
 ```
 
 Hoặc chạy trực tiếp: `python tools\alo-run.py <file.py|.ipynb|folder>`. Một số cách dùng:
